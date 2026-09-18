@@ -254,10 +254,10 @@
   table.rahmen-table col.c-gewerk{ width:auto; }
   table.rahmen-table col.c-tpvon{ width:64.3px; }
   table.rahmen-table col.c-tpbis{ width:64.3px; }
-  table.rahmen-table col.c-stand{ width:83.1px; }
+  table.rahmen-table col.c-stand{ width:114px; }
   table.rahmen-table col.c-proz{ width:30.2px; }
   table.rahmen-table col.c-ampel{ width:13.2px; }
-  table.rahmen-table col.c-prognose{ width:90.7px; }
+  table.rahmen-table col.c-prognose{ width:60px; }
   table.rahmen-table td.num{ text-align:right; padding-right:4px; }
   table.rahmen-table td.status-cell{ width:13.2px; padding:6.4px 0; }
   .status-swatch{
@@ -1231,20 +1231,16 @@ function handlePhoto(e){
     drawTimestamp(smallCtx, w, h);
     const previewDataUrl = smallCanvas.toDataURL('image/jpeg', 0.65);
 
-    // Zusätzliche, deutlich höher aufgelöste Version NUR für den PDF-Export
-    // und die Berichtsvorschau (kein Vercel-Größenlimit dort, da PDF
-    // vollständig im Browser erzeugt wird) - verhindert verpixelte Fotos im
-    // PDF, ohne die Word-Erstellung mit großen Dateien zu belasten.
-    const printMaxDim = 1800;
-    let pw = fullW, ph = fullH;
-    if (pw > ph && pw > printMaxDim){ ph = Math.round(ph * printMaxDim / pw); pw = printMaxDim; }
-    else if (ph >= pw && ph > printMaxDim){ pw = Math.round(pw * printMaxDim / ph); ph = printMaxDim; }
+    // Zusätzliche Version in voller Original-Auflösung NUR für den PDF-
+    // Export und die Berichtsvorschau (kein Vercel-Größenlimit dort, da PDF
+    // vollständig im Browser erzeugt wird) - höchstmögliche Bildqualität,
+    // keine Verkleinerung mehr.
     const printCanvas = document.createElement('canvas');
-    printCanvas.width = pw; printCanvas.height = ph;
+    printCanvas.width = fullW; printCanvas.height = fullH;
     const printCtx = printCanvas.getContext('2d');
-    printCtx.drawImage(oriented, 0, 0, pw, ph);
-    drawTimestamp(printCtx, pw, ph);
-    const printDataUrl = printCanvas.toDataURL('image/jpeg', 0.88);
+    printCtx.drawImage(oriented, 0, 0, fullW, fullH);
+    drawTimestamp(printCtx, fullW, fullH);
+    const printDataUrl = printCanvas.toDataURL('image/jpeg', 0.97);
 
     // Vollformat-Version in Original-Auflösung für die Fotogalerie (nicht
     // Teil des Berichts/JSON - nur fürs eigene Archiv auf dem Gerät).
@@ -1984,8 +1980,12 @@ async function exportPdf(){
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
     for(let i=0; i<pageNodes.length; i++){
-      const canvas = await html2canvas(pageNodes[i], { scale: 2.5, useCORS: true, backgroundColor: '#ffffff' });
-      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      // scale:3.13 entspricht bei 794px Seitenbreite (=210mm bei 96dpi)
+      // einer Rasterauflösung von ~300dpi - Standard-Druckqualität für Text
+      // und Linien. Höhere Werte bringen kaum sichtbaren Gewinn, erhöhen
+      // aber Dateigröße und Rechenzeit überproportional.
+      const canvas = await html2canvas(pageNodes[i], { scale: 3.13, useCORS: true, backgroundColor: '#ffffff' });
+      const imgData = canvas.toDataURL('image/jpeg', 0.98);
       if(i > 0) pdf.addPage();
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
     }
