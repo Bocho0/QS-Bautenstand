@@ -373,12 +373,12 @@
       <label class="photo-box" for="photoInput">
         <div id="photoPlaceholder">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7h3l2-2h6l2 2h3v12H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
-          <div class="cta">Foto aufnehmen / auswählen<span class="big">wird sofort als Feststellung gespeichert</span></div>
+          <div class="cta">Foto aufnehmen / Fotos auswählen<span class="big">jedes Foto wird sofort als eigene Feststellung gespeichert</span></div>
         </div>
         <img id="photoPreview" style="display:none">
       </label>
-      <input type="file" id="photoInput" accept="image/*" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden" onchange="handlePhoto(event)">
-      <div class="hint">Foto wird sofort ohne weitere Eingabe als Feststellung gesichert (Gewerk, Ort, Info usw. trägst du später bequem auf der Berichtsseite ein) und zusätzlich in Originalqualität in deine Fotogalerie angeboten.</div>
+      <input type="file" id="photoInput" accept="image/*" multiple style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden" onchange="handlePhoto(event)">
+      <div class="hint">Es können auch mehrere Fotos auf einmal ausgewählt werden — jedes Foto wird automatisch als eigene Feststellung angelegt (Gewerk, Ort, Info usw. trägst du später bequem auf der Berichtsseite ein) und zusätzlich in Originalqualität in deine Fotogalerie angeboten.</div>
     </div>
 
     <div class="card">
@@ -1187,14 +1187,59 @@ function loadOrientedImage(file){
 }
 
 function handlePhoto(e){
-  const file = e.target.files[0];
-  if(!file) return;
-  const originalCta = document.getElementById('photoPlaceholder').innerHTML;
-  document.getElementById('photoPlaceholder').innerHTML = '<div class="cta"><span class="big">Foto wird gespeichert …</span></div>';
-  document.getElementById('photoPlaceholder').style.display = 'block';
-  document.getElementById('photoPreview').style.display = 'none';
+  const files = Array.from(e.target.files || []);
+  if(!files.length) return;
+  // Input sofort zuruecksetzen, damit dieselbe(n) Datei(en) danach erneut
+  // ausgewaehlt werden koennen (Browser feuert sonst kein change-Event mehr).
+  e.target.value = '';
+  processPhotoFiles(files);
+}
 
-  loadOrientedImage(file).then(function(oriented){
+// Verarbeitet eine Liste ausgewaehlter Fotos NACHEINANDER (nicht parallel,
+// um Speicher/CPU auf schwaecheren Geraeten nicht zu ueberlasten) und legt
+// fuer JEDES Foto eine eigene Feststellung an - so laesst sich z.B. ein
+// ganzer Rundgang mit vielen Fotos auf einmal auswaehlen, statt jedes Foto
+// einzeln nacheinander aufzunehmen.
+async function processPhotoFiles(files){
+  const placeholder = document.getElementById('photoPlaceholder');
+  const preview = document.getElementById('photoPreview');
+  const originalCta = placeholder.innerHTML;
+  const total = files.length;
+  // Ein gemeinsamer Zeitbasis-Wert pro Auswahl, damit alle Fotos dieser
+  // Auswahl in der richtigen Reihenfolge einsortiert werden (sortOrder
+  // bleibt dabei im selben Wertebereich wie Date.now() an anderen Stellen
+  // der App - nur hochgezaehlt statt multipliziert).
+  const batchBase = Date.now();
+  const failed = [];
+
+  placeholder.style.display = 'block';
+  preview.style.display = 'none';
+
+  for(let i = 0; i < total; i++){
+    const label = total > 1 ? `Foto ${i + 1} von ${total} wird gespeichert …` : 'Foto wird gespeichert …';
+    placeholder.innerHTML = `<div class="cta"><span class="big">${escapeHtml(label)}</span></div>`;
+    try{
+      await processSinglePhoto(files[i], batchBase + i);
+    }catch(err){
+      console.error(err);
+      failed.push(files[i].name || `Foto ${i + 1}`);
+    }
+  }
+
+  preview.style.display = 'none';
+  placeholder.style.display = 'block';
+  placeholder.innerHTML = originalCta;
+
+  if(failed.length){
+    alert(`${failed.length} von ${total} Foto(s) konnten nicht verarbeitet werden:\n` + failed.join('\n'));
+  }
+}
+
+// Verarbeitet genau EIN Foto: Ausrichtung korrigieren, Vorschau-/Druck-/
+// Vollversion erzeugen, als neue Feststellung speichern. Gibt ein Promise
+// zurueck, das erst nach vollstaendigem Speichern (inkl. Galerie) aufgeloest wird.
+function processSinglePhoto(file, sortOrder){
+  return loadOrientedImage(file).then(function(oriented){
     const fullW = oriented.width, fullH = oriented.height;
 
     function drawTimestamp(ctx, w, h){
@@ -1250,36 +1295,33 @@ function handlePhoto(e){
     fullCtx.drawImage(oriented, 0, 0, fullW, fullH);
     drawTimestamp(fullCtx, fullW, fullH);
 
-    fullCanvas.toBlob(function(fullBlob){
-      // Feststellung sofort ohne Text speichern - Gewerk/Ort/Info etc.
-      // werden erst später auf der Berichtsseite eingetragen.
-      const entryId = 'e_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
-      const nowIso = new Date().toISOString().slice(0,10);
-      const entry = {
-        id: entryId, type: currentType, gewerk: '', ort: '', arbeiten: '',
-        bauteil: '', material: '', verantwortlich: '',
-        datum: todayStr(), datumISO: nowIso, bearbeitet: false,
-        sortOrder: Date.now(), photoUrl: previewDataUrl, photoPrintUrl: printDataUrl, createdAt: Date.now()
-      };
-      allEntries.push(entry);
-      renderRecent();
-      idbPutEntry(entry);
+    return new Promise(function(resolve, reject){
+      fullCanvas.toBlob(function(fullBlob){
+        try{
+          // Jedes Foto wird sofort als eigene, eigenständige Feststellung
+          // gespeichert - Gewerk/Ort/Info etc. werden erst später auf der
+          // Berichtsseite eingetragen.
+          const entryId = 'e_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+          const nowIso = new Date().toISOString().slice(0,10);
+          const entry = {
+            id: entryId, type: currentType, gewerk: '', ort: '', arbeiten: '',
+            bauteil: '', material: '', verantwortlich: '',
+            datum: todayStr(), datumISO: nowIso, bearbeitet: false,
+            sortOrder, photoUrl: previewDataUrl, photoPrintUrl: printDataUrl, createdAt: Date.now()
+          };
+          allEntries.push(entry);
+          renderRecent();
+          idbPutEntry(entry);
 
-      document.getElementById('photoPreview').src = previewDataUrl;
-      document.getElementById('photoPreview').style.display = 'block';
-      document.getElementById('photoPlaceholder').style.display = 'none';
-      setTimeout(() => {
-        document.getElementById('photoPreview').style.display = 'none';
-        document.getElementById('photoPlaceholder').style.display = 'block';
-        document.getElementById('photoPlaceholder').innerHTML = originalCta;
-      }, 900);
+          document.getElementById('photoPreview').src = previewDataUrl;
+          document.getElementById('photoPreview').style.display = 'block';
+          document.getElementById('photoPlaceholder').style.display = 'none';
 
-      if(fullBlob) saveToGalleryBlob(fullBlob, entry);
-    }, 'image/jpeg', 0.92);
-  }).catch(function(err){
-    console.error(err);
-    alert('Foto konnte nicht verarbeitet werden: ' + (err && err.message ? err.message : err));
-    document.getElementById('photoPlaceholder').innerHTML = originalCta;
+          if(fullBlob) saveToGalleryBlob(fullBlob, entry);
+          resolve();
+        }catch(err){ reject(err); }
+      }, 'image/jpeg', 0.92);
+    });
   });
 }
 
