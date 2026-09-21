@@ -126,10 +126,9 @@
   }
   .drag-handle{ width:26px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:18px; color:var(--muted); cursor:grab; touch-action:none; user-select:none; padding-top:14px; }
   .edit-row.dragging{ opacity:0.85; box-shadow:0 6px 16px rgba(0,0,0,0.18); background:var(--white); position:relative; z-index:5; }
-  .order-btns{ display:flex; flex-direction:column; gap:4px; flex-shrink:0; padding-top:2px; }
-  .order-btn{ width:34px; height:34px; padding:0; display:flex; align-items:center; justify-content:center; font-size:15px; line-height:1; border:1px solid var(--line); border-radius:4px; background:var(--white); color:var(--charcoal); cursor:pointer; touch-action:manipulation; }
-  .order-btn:active{ background:var(--concrete); }
-  .order-btn:disabled{ opacity:0.3; cursor:default; }
+  .edit-row.drag-over{ border-top:2.5px solid var(--accent); }
+  .drag-handle{ display:flex; align-items:center; justify-content:center; width:30px; flex-shrink:0; align-self:stretch; color:var(--muted); cursor:grab; touch-action:none; }
+  .drag-handle:active{ cursor:grabbing; }
   .wetter-btn{ font-size:11px; font-weight:500; background:none; border:1px solid var(--line); border-radius:3px; padding:2px 6px; margin-left:6px; cursor:pointer; color:var(--muted); }
   .wetter-btn:hover{ background:var(--concrete); }
   .wetter-btn:disabled{ opacity:0.5; cursor:default; }
@@ -430,9 +429,10 @@
       <textarea class="mono" id="rVerteiler" style="display:none" aria-hidden="true"></textarea>
       <textarea class="mono" id="rRahmen" style="display:none" aria-hidden="true"></textarea>
 
+      <div id="rahmenVerteilerBlock">
       <details class="help" style="margin-top:14px" open>
         <summary>Rahmentermine festlegen (einmalig pro Projekt)</summary>
-        <div class="ex" style="font-family:inherit;white-space:normal">Hier einmal zu Projektbeginn Haus, Gewerk und die Ausführung nach TP (von/bis) je Zeile anlegen. Bei jedem weiteren Bericht müssen dann nur noch Bautenstand, Prozent, Pünktlichkeit und ggf. Prognose unten aktualisiert werden — die Liste selbst bleibt gleich.</div>
+        <div class="ex" style="font-family:inherit;white-space:normal">Hier einmal zu Projektbeginn Bereich, Gewerk und die Ausführung nach TP (von/bis) je Zeile anlegen. Bei jedem weiteren Bericht müssen dann nur noch Bautenstand, Prozent, Pünktlichkeit und ggf. Prognose unten aktualisiert werden — die Liste selbst bleibt gleich.</div>
         <label style="margin-top:12px">Hinweistext über der Tabelle <span style="font-weight:400;color:var(--muted)">(projektspezifisch, erscheint im Bericht — z. B. auf welchen Terminplan sich „TP vom" bezieht)</span></label>
         <input type="text" id="rRahmenHinweis" placeholder="z. B. Hinweis: TP vom 14.04.2026 ist der optimierte Detailterminplan (Best-Case-Szenario)">
         <div id="rahmenSetupEditor" style="margin-top:10px"></div>
@@ -447,6 +447,7 @@
         <div id="verteilerEditor" style="margin-top:10px"></div>
         <button type="button" class="btn-secondary small" style="margin-top:8px" onclick="addVerteilerRow()">+ Empfänger hinzufügen</button>
       </details>
+      </div>
 
       <label>Verlauf vorheriger Berichte <span style="font-weight:400;color:var(--muted)">(Kurzdarstellung, wird automatisch beim Fortführen einer Berichtsreihe ergänzt)</span></label>
       <div id="verlaufList"><div class="empty">Noch kein Verlauf — entsteht automatisch, wenn eine JSON-Datei zum Fortführen der Berichtsreihe hochgeladen wird.</div></div>
@@ -530,8 +531,10 @@ function setBerichtsModus(modus){
   });
   const hint = document.getElementById('modusHint');
   if(hint) hint.textContent = berichtsModus === 'kurz'
-    ? 'Kurzbericht: nur Deckblatt und Dokumentation. Verteiler, Rahmentermine und Verlauf bleiben gespeichert, werden aber nicht ausgegeben.'
+    ? 'Kurzbericht: nur Deckblatt und Dokumentation. Verteiler und Rahmentermine bleiben gespeichert, werden aber nicht abgefragt und nicht ausgegeben.'
     : 'Vollständiger QS-Bericht mit Verteiler, Rahmenterminen, Verlauf und Inhaltsverzeichnis.';
+  const rahmenVerteilerBlock = document.getElementById('rahmenVerteilerBlock');
+  if(rahmenVerteilerBlock) rahmenVerteilerBlock.style.display = berichtsModus === 'kurz' ? 'none' : '';
   idbPutMeta('berichtsModus', berichtsModus).catch(()=>{});
   refreshReportViews();
 }
@@ -1626,7 +1629,7 @@ function renderRahmenSetup(){
   const rows = getRahmenRows();
   container.innerHTML = rows.length ? `
     <table class="editable-table">
-      <tr><th>Haus</th><th>Gewerk</th><th>TP von</th><th>TP bis</th><th></th></tr>
+      <tr><th>Bereich</th><th>Gewerk</th><th colspan="2">TP</th><th></th></tr>
       ${rows.map((r,i) => {
         const [haus='',gewerk='',tpVon='',tpBis=''] = r;
         return `<tr>
@@ -1647,7 +1650,7 @@ function renderRahmenStatus(){
   if(!rows.length){ container.innerHTML = '<div class="empty">Erst oben unter „Rahmentermine festlegen" Zeilen anlegen.</div>'; return; }
   container.innerHTML = `
     <table class="editable-table">
-      <tr><th>Haus</th><th>Gewerk</th><th>TP von–bis</th><th>Bautenstand</th><th>%</th><th>Pünktlichkeit</th><th>Prognose zum TP</th></tr>
+      <tr><th>Bereich</th><th>Gewerk</th><th>TP</th><th>Bautenstand</th><th>%</th><th>Pünktlichkeit</th><th>Prognose zum TP</th></tr>
       ${rows.map((r,i) => {
         const [haus='',gewerk='',tpVon='',tpBis='',bautenstand='',prozent='',status='',prognose=''] = r;
         return `<tr>
@@ -1741,10 +1744,11 @@ function renderEditor(){
     const list = editorShowOnlyOpen ? fullList.filter(e=>!e.bearbeitet) : fullList;
     if(!list.length) return `<div class="empty">${editorShowOnlyOpen ? 'Keine unbearbeiteten Einträge mehr' : 'Keine Einträge'}</div>`;
     return list.map((e, idx) => `
-    <div class="edit-row" data-id="${e.id}">
-      <div class="order-btns">
-        <button type="button" class="order-btn" onclick="moveEntry('${e.id}','up')" ${idx===0 ? 'disabled' : ''} title="Nach oben verschieben">▲</button>
-        <button type="button" class="order-btn" onclick="moveEntry('${e.id}','down')" ${idx===list.length-1 ? 'disabled' : ''} title="Nach unten verschieben">▼</button>
+    <div class="edit-row" data-id="${e.id}" draggable="true"
+      ondragstart="handleDragStart(event,'${e.id}')" ondragend="handleDragEnd(event)"
+      ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event,'${e.id}')">
+      <div class="drag-handle" title="Zum Verschieben ziehen">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>
       </div>
       <div class="edit-thumb"><img src="${e.photoUrl}" onclick="openLightboxById('${e.id}')" title="Zum Vergrößern klicken"></div>
       <div class="edit-fields">
@@ -1780,22 +1784,58 @@ function closeLightbox(){
   document.getElementById('lightbox').classList.remove('active');
 }
 
-// Reihenfolge per Auf/Ab-Button ändern - statt freiem Ziehen (dabei kam es zu
-// unvorhersehbaren Sprüngen durch die Kombination aus CSS-Transform und
-// gleichzeitiger DOM-Neuanordnung). Diese Variante vertauscht ausschließlich
-// die sortOrder-Werte zweier direkt benachbarter Einträge - eindeutig,
-// nachvollziehbar und ohne jede Koordinaten-/Positionsberechnung.
-function moveEntry(id, dir){
-  const e = allEntries.find(x => x.id === id);
-  if(!e) return;
-  const group = allEntries.filter(x => x.type === e.type).slice().sort((a,b) => (a.sortOrder||0) - (b.sortOrder||0));
-  const idx = group.findIndex(x => x.id === id);
-  const swapIdx = dir === 'up' ? idx - 1 : idx + 1;
-  if(swapIdx < 0 || swapIdx >= group.length) return;
-  const other = group[swapIdx];
-  const tmp = e.sortOrder;
-  updateEntryFields(e.id, { sortOrder: other.sortOrder });
-  updateEntryFields(other.id, { sortOrder: tmp });
+// Reihenfolge per Maus-Drag ändern (HTML5 Drag-and-Drop-API - kein eigenes
+// Koordinaten-/Transform-Handling nötig, dadurch robust). Gezogen wird immer
+// nur innerhalb derselben Liste (Dokumentation bzw. Veranlassungen bleiben
+// getrennt); der gezogene Eintrag wird vor dem Zieleintrag einsortiert und
+// alle sortOrder-Werte der betroffenen Gruppe danach neu, fortlaufend vergeben.
+let dragEntryId = null;
+
+function handleDragStart(e, id){
+  dragEntryId = id;
+  e.dataTransfer.effectAllowed = 'move';
+  try{ e.dataTransfer.setData('text/plain', id); }catch(err){}
+  e.currentTarget.classList.add('dragging');
+}
+
+function handleDragEnd(e){
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.edit-row.drag-over').forEach(el => el.classList.remove('drag-over'));
+  dragEntryId = null;
+}
+
+function handleDragOver(e){
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const row = e.currentTarget;
+  if(row.dataset.id === dragEntryId) return;
+  document.querySelectorAll('.edit-row.drag-over').forEach(el => { if(el !== row) el.classList.remove('drag-over'); });
+  row.classList.add('drag-over');
+}
+
+function handleDragLeave(e){
+  e.currentTarget.classList.remove('drag-over');
+}
+
+function handleDrop(e, targetId){
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  const draggedId = dragEntryId;
+  dragEntryId = null;
+  if(!draggedId || draggedId === targetId) return;
+  const dragged = allEntries.find(x => x.id === draggedId);
+  const target = allEntries.find(x => x.id === targetId);
+  if(!dragged || !target || dragged.type !== target.type) return;
+
+  const group = allEntries.filter(x => x.type === dragged.type).slice().sort((a,b) => (a.sortOrder||0) - (b.sortOrder||0));
+  const fromIdx = group.findIndex(x => x.id === draggedId);
+  if(fromIdx === -1) return;
+  group.splice(fromIdx, 1);
+  const insertAt = group.findIndex(x => x.id === targetId);
+  group.splice(insertAt, 0, dragged);
+
+  const base = Date.now();
+  group.forEach((entry, i) => updateEntryFields(entry.id, { sortOrder: base + i }));
   renderEditor();
   refreshReportViews();
 }
@@ -1906,12 +1946,12 @@ function renderReport(){
     // ableiten (bestehendes Feld, keine neue Datenquelle) - Konvention: der
     // Hinweistext beginnt mit "TP vom TT.MM.JJJJ ...".
     const tpDateMatch = /TP\s+vom\s+(\d{1,2}\.\d{1,2}\.\d{2,4})/i.exec(rahmenHinweis);
-    const tpHeader = tpDateMatch ? `TP vom ${tpDateMatch[1]}` : 'TP von / TP bis';
+    const tpHeader = tpDateMatch ? `TP vom ${tpDateMatch[1]}` : 'TP';
     rahmenBody += `<h3 class="section">Rahmentermine</h3>
       ${rahmenHinweis ? `<div class="section-note">${escapeHtml(rahmenHinweis)}</div>` : ''}
       <table class="rahmen-table">
         <colgroup><col class="c-haus"><col class="c-gewerk"><col class="c-tpvon"><col class="c-tpbis"><col class="c-stand"><col class="c-proz"><col class="c-ampel"><col class="c-prognose"></colgroup>
-        <tr><th>Haus</th><th>Gewerk</th><th colspan="2">${escapeHtml(tpHeader)}</th><th colspan="3">Bautenstand</th><th>Prognose</th></tr>
+        <tr><th>Bereich</th><th>Gewerk</th><th colspan="2">${escapeHtml(tpHeader)}</th><th colspan="3">Bautenstand</th><th>Prognose</th></tr>
         ${rahmenRows.length > 0 ? rahmenRows.map(r => {
           const [haus='', gewerk='', tpVon='', tpBis='', bautenstand='', prozent='', status='', prognose=''] = r;
           const swatchColor = RAHMEN_SWATCH_COLOR[status] || '';
