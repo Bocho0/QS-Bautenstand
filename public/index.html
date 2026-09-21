@@ -53,6 +53,7 @@
   .type-toggle button{ flex:1; padding:12px 6px; border-radius:var(--radius); border:1.5px solid var(--line); background:var(--concrete); font-family:'Inter'; font-weight:700; font-size:13px; cursor:pointer; color:var(--muted); }
   .type-toggle button.on[data-type="doku"]{ background:var(--charcoal); color:var(--white); border-color:var(--charcoal); }
   .type-toggle button.on[data-type="veranlassung"]{ background:var(--rust); color:var(--white); border-color:var(--rust); }
+  .type-toggle button.on[data-modus]{ background:var(--charcoal); color:var(--white); border-color:var(--charcoal); }
   label.photo-box{ border:2px dashed var(--line); border-radius:var(--radius); background:var(--concrete); text-align:center; padding:22px 12px; cursor:pointer; position:relative; overflow:hidden; display:block; }
   .photo-box img{ display:block; width:100%; height:280px; object-fit:contain; background:var(--concrete-2); border-radius:2px; }
   .photo-box .cta{ color:var(--muted); font-weight:600; font-size:14px; }
@@ -239,6 +240,15 @@
   }
   .wetter-band .tag{ font-weight:500; }
 
+  /* ---- Kurzbericht: Dokumentation-Titel + Wetterband in einer Zeile ---- */
+  .doku-head-row{
+    display:flex; align-items:center; justify-content:space-between; gap:30px;
+    height:28.7px;            /* 7,6mm */
+    margin:17px 0 0;          /* 4,5mm */
+  }
+  .doku-head-row h3.section{ margin:0; }
+  .doku-head-row .wetter-band{ margin:0; gap:22.7px; }
+
   /* ---- Abschnittstitel ---- */
   h3.section{
     font-family:Barlow,sans-serif; font-weight:500;
@@ -392,6 +402,15 @@
   <section id="view-report" class="view">
 
     <div class="card no-print">
+      <h2>Berichtsart</h2>
+      <div class="type-toggle">
+        <button type="button" class="on" data-modus="qs" onclick="setBerichtsModus('qs')">QS-Bericht</button>
+        <button type="button" data-modus="kurz" onclick="setBerichtsModus('kurz')">Baustellen-Kurzbericht</button>
+      </div>
+      <div class="hint" id="modusHint">Vollständiger QS-Bericht mit Verteiler, Rahmenterminen, Verlauf und Inhaltsverzeichnis.</div>
+    </div>
+
+    <div class="card no-print">
       <h2>Berichtskopf</h2>
       <div class="report-meta">
         <div class="full"><label>Projekt / Baustelle</label><input type="text" id="rProjekt" placeholder="z. B. XY | München"></div>
@@ -499,6 +518,24 @@
 <script>
 let allEntries = [];
 let verlaufEntries = [];
+// Berichtsart: 'qs' = vollständiger QS-Bericht (unverändertes Verhalten),
+// 'kurz' = Baustellen-Kurzbericht ohne Verteiler, Rahmentermine, Verlauf und
+// Inhaltsverzeichnis. Beide Modi teilen sich alle Eingabefelder.
+let berichtsModus = 'qs';
+
+function setBerichtsModus(modus){
+  berichtsModus = (modus === 'kurz') ? 'kurz' : 'qs';
+  document.querySelectorAll('.type-toggle button[data-modus]').forEach(b => {
+    b.classList.toggle('on', b.dataset.modus === berichtsModus);
+  });
+  const hint = document.getElementById('modusHint');
+  if(hint) hint.textContent = berichtsModus === 'kurz'
+    ? 'Kurzbericht: nur Deckblatt und Dokumentation. Verteiler, Rahmentermine und Verlauf bleiben gespeichert, werden aber nicht ausgegeben.'
+    : 'Vollständiger QS-Bericht mit Verteiler, Rahmenterminen, Verlauf und Inhaltsverzeichnis.';
+  idbPutMeta('berichtsModus', berichtsModus).catch(()=>{});
+  refreshReportViews();
+}
+
 let logoDataUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEUAAABFCAMAAAArU9sbAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAGnUExURf////7+/tvb25mZmZGRkY+Pj5ycnOjo6KysrJCQkMvLy/39/ZeXl0REREVFRTk5OcXFxcDAwFFRUUFBQWFhYczMzI6OjkZGRjs7O7u7u8HBwVJSUkJCQmBgYEdHR0lJSUhISF9fX4mJiYyMjIqKiouLi1xcXI2NjXV1dYODgz8/P/n5+cLCwjw8PPj4+IGBgT4+Pjo6OvX19b+/v/v7+4WFhUpKSr29va+vr9XV1e/v79zc3N7e3vPz80NDQ9bW1qmpqZ6enjMzMzIyMra2tqKiorq6uqGhoaioqFNTU05OTvz8/Kenp62trWdnZ66uroKCgoSEhIeHh/f39/b29vDw8H5+fmhoaJ+fnz09Pbm5ucrKypaWljQ0NMfHx0tLS/T09Ly8vDc3N2NjY9PT09HR0eTk5Onp6dnZ2YiIiLCwsPHx8e7u7uzs7MjIyICAgN/f339/f3t7e6SkpJKSksPDw8/Pz7e3t0BAQGpqaqqqqqWlpfLy8ri4uPr6+mVlZZubm5iYmJWVlX19fU1NTV5eXllZWdjY2Orq6uHh4ZqampOTk76+vrsXhk4AAAAJcEhZcwAAFxEAABcRAcom8z8AAANnSURBVFhH3ZjpV1JBFMDvCzD1BWoYICIPASMhFU1xKyst06i0tAVbUCvN1GxfbLOibPujOzODvJnLvIX0Q6efXzhzr78zc99s7wGAYgZQcKsAzdjncBriqtpPJdU4oFPjrFUA1ANujzF19cTScNAkx9t4CED1efzGBJpIh4PNJjmhltq9tYS1csLIguOapkUES7jVFY3Fi39tlFj8sFuweOIJTM2REG/R2tgT5VHak4IllMIZAEc7rCydXWm/v5uz9OAMgGOiJYrjAL19oUwm2b9by0BfPN4+SH7atGRiOC5g0yLrC4ddi6S6HHYtdvoiedJB0RLfaVeGho9zDJ+gycQycpIPME6l5dVNnR5Nc4yd0VdAkg8wvGH5iFJnO/ilFhivYDXq1d2VRe/LuW53EfKfvGWnnYM0y6qbmtCaKZPNGY9oYe08k+fJs5NUNzt4oZpyceJSSLC4iwGOqahXPiKOPrIz6JaQihMA6gPyEemkppHlr+auejldqeXKTA9i9uq1SvsSuX6jCuNoFKtrbfGP5MpIu8X5YsNihG1LzNQyRywNppbWmwDqrQAei07H7SCx3MkHcrm6eewAWBjL5Rbv3gOA+z6XAT5fLLZEkpcdvoQrKtmlHqzEfPGHq7hZQAF9uqqQFWJFlCzp6//J6pqEIcraPBt2Dw5zrNOqP5rekNBF2dh4TFKWfE9wXOfps3UA9XkO7+wco/S0f5E3yalreQmgJkzn7ivysOncNYLNXbvryAh+TaeTZdA1vUDqwiyvcUISnWqRN1ObiGq2e9PVyHbvtzhlc2BF2L0zbUoWoXZOkx1Tt4Te4ZQs9FvePLJ0331PqsssszgDoMHyLvWBngEV3Q4lJwmz6NW1YZGcJOw8mtNHZGmRjai3HVXX0iIbUbEvlVgkfWHndBP5xSySXU08p8MftxyYT40jQnXdn3GGY+uL8Dbh1wrlkNcWbr74cbxQKOTRWxZ+j/N4aDNXF1mKeJcyhLcYYNEXwuJ4qS5GKd6vpf0lks/ICH/b1i04yNDCNe92nnTXdynL670ly8gPHGUsk+u54azjYPNlBjdzGK4jDsO5W8JwHXHYtOxNX/4pi2Tf5bBr2XVfyPeXyApuFgiS7y9eM4uy/dP1y/kbNwsoU06XKyG513HoH5cMsUr5Ax5gj6pG+yeiAAAAAElFTkSuQmCC"; // Standardlogo (Datei-Upload überschreibt dies)
 
 // ===================== LOKALE ZWISCHENSPEICHERUNG (IndexedDB) =====================
@@ -667,6 +704,8 @@ async function idbClearAll(){
 async function restoreFromIdb(){
   const stored = await idbGetAllEntries();
   await restoreBerichtskopfFromIdb();
+  const storedModus = await idbGetMeta('berichtsModus');
+  if(storedModus === 'kurz' || storedModus === 'qs') setBerichtsModus(storedModus);
   renderVerteilerEditor();
   renderRahmenSetup();
   renderRahmenStatus();
@@ -1829,6 +1868,9 @@ function chunk3(arr){
 function renderReport(){
   const logoHtml = logoDataUrl ? `<img src="${logoDataUrl}">` : `<div class="logo-placeholder"><div></div><div></div><div></div><div></div></div>`;
 
+  const kurz = berichtsModus === 'kurz';
+  const subtitle = kurz ? 'Baustellen-Kurzbericht' : 'Leistungsfeststellung – Qualitätssicherung';
+
   const projekt = document.getElementById('rProjekt').value || '—';
   const baustelle = document.getElementById('rBaustelle').value || '—';
   const kunde = document.getElementById('rKunde').value || '—';
@@ -1839,7 +1881,7 @@ function renderReport(){
   const berichtsNr = document.getElementById('rBerichtsNr').value.trim() || '1';
   const berichtsNrPadded = berichtsNr.padStart(3,'0');
   const isoToday = new Date().toISOString().slice(2,10).replace(/-/g,'');
-  const autoDateiname = isoToday + '_' + escapeHtml(verfasser) + '-QS-Bautenstand_' + berichtsNrPadded + '.docx';
+  const autoDateiname = isoToday + '_' + escapeHtml(verfasser) + (kurz ? '-Kurzbericht_' : '-QS-Bautenstand_') + berichtsNrPadded + '.docx';
   const dateiname = (document.getElementById('rDateiname').value.trim() || autoDateiname).replace(/\.docx$/i, '');
 
   const verteilerRows = parseSemicolonRows(document.getElementById('rVerteiler').value);
@@ -1852,58 +1894,71 @@ function renderReport(){
   const toc = [];
   let pageCounter = 2;
 
-  let rahmenBody = `
-    <div class="wetter-band"><span class="tag">${weekdayAbbrevDe(datum) ? weekdayAbbrevDe(datum) + ', ' : ''}${escapeHtml(datum)}</span><span>Min. ${escapeHtml(tempMin || '—')}</span><span>Max. ${escapeHtml(tempMax || '—')}</span></div>`;
-  const rahmenHinweis = document.getElementById('rRahmenHinweis').value.trim();
-  // TP-Datum fuer den zusammengefassten Tabellenkopf aus dem Hinweistext
-  // ableiten (bestehendes Feld, keine neue Datenquelle) - Konvention: der
-  // Hinweistext beginnt mit "TP vom TT.MM.JJJJ ...".
-  const tpDateMatch = /TP\s+vom\s+(\d{1,2}\.\d{1,2}\.\d{2,4})/i.exec(rahmenHinweis);
-  const tpHeader = tpDateMatch ? `TP vom ${tpDateMatch[1]}` : 'TP von / TP bis';
-  rahmenBody += `<h3 class="section">Rahmentermine</h3>
-    ${rahmenHinweis ? `<div class="section-note">${escapeHtml(rahmenHinweis)}</div>` : ''}
-    <table class="rahmen-table">
-      <colgroup><col class="c-haus"><col class="c-gewerk"><col class="c-tpvon"><col class="c-tpbis"><col class="c-stand"><col class="c-proz"><col class="c-ampel"><col class="c-prognose"></colgroup>
-      <tr><th>Haus</th><th>Gewerk</th><th colspan="2">${escapeHtml(tpHeader)}</th><th colspan="3">Bautenstand</th><th>Prognose</th></tr>
-      ${rahmenRows.length > 0 ? rahmenRows.map(r => {
-        const [haus='', gewerk='', tpVon='', tpBis='', bautenstand='', prozent='', status='', prognose=''] = r;
-        const swatchColor = RAHMEN_SWATCH_COLOR[status] || '';
-        const muted = !status ? ' muted' : '';
-        return `<tr><td class="haus">${escapeHtml(haus)}</td><td>${escapeHtml(gewerk)}</td><td>${escapeHtml(tpVon)}</td><td>${escapeHtml(tpBis)}</td><td class="${muted.trim()}">${escapeHtml(bautenstandLabel(bautenstand))}</td><td class="num${muted}">${prozent !== '' ? escapeHtml(prozent) : ''}</td><td class="status-cell">${swatchColor ? `<i class="status-swatch" style="background:${swatchColor}"></i>` : ''}</td><td>${escapeHtml(prognose)}</td></tr>`;
-      }).join('') : Array.from({length:12}).map(() => `<tr class="blank-row"><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`).join('')}
-    </table>
-    <div class="ampel-legende">
-      <span><i style="background:#8FAF6E"></i>Termin unkritisch</span>
-      <span><i style="background:#E0903C"></i>Termin kritisch</span>
-      <span><i style="background:#D9463B"></i>Termin überschritten</span>
-    </div>`;
+  // Wetterband-Inhalt einmal gebaut - erscheint je nach Berichtsart entweder
+  // oben auf der Rahmentermine-Seite (QS-Bericht) oder neben der Überschrift
+  // "Dokumentation" auf der ersten Dokumentationsseite (Kurzbericht).
+  const wetterBandHtml = `<div class="wetter-band"><span class="tag">${weekdayAbbrevDe(datum) ? weekdayAbbrevDe(datum) + ', ' : ''}${escapeHtml(datum)}</span><span>Min. ${escapeHtml(tempMin || '—')}</span><span>Max. ${escapeHtml(tempMax || '—')}</span></div>`;
 
-  // Verlauf vorheriger Berichte gehört (wie im Word-Dokument) auf die
-  // Rahmentermine-Seite, nicht auf die Dokumentationsseite.
-  if(verlaufEntries.length){
-    rahmenBody += `<h3 class="section">Verlauf vorheriger Berichte</h3>
-      <table class="doku-index"><colgroup><col style="width:70px"><col style="width:160px"><col></colgroup><tr><th>Nr.</th><th>Zeitraum</th><th>Zusammenfassung</th></tr>`;
-    verlaufEntries.forEach(v => {
-      const range = (v.von === v.bis) ? String(v.von) : `${v.von}–${v.bis}`;
-      const zeitraum = v.zeitraumVon === v.zeitraumBis ? v.zeitraumVon : `${v.zeitraumVon} – ${v.zeitraumBis}`;
-      rahmenBody += `<tr><td>${escapeHtml(range)}</td><td>QS-Bericht ${escapeHtml(String(v.berichtNr).padStart(3,'0'))} vom ${escapeHtml(zeitraum||'')}</td><td>${escapeHtml(v.zusammenfassung||'')}</td></tr>`;
-    });
-    rahmenBody += `</table>`;
+  if(!kurz){
+    let rahmenBody = wetterBandHtml;
+    const rahmenHinweis = document.getElementById('rRahmenHinweis').value.trim();
+    // TP-Datum fuer den zusammengefassten Tabellenkopf aus dem Hinweistext
+    // ableiten (bestehendes Feld, keine neue Datenquelle) - Konvention: der
+    // Hinweistext beginnt mit "TP vom TT.MM.JJJJ ...".
+    const tpDateMatch = /TP\s+vom\s+(\d{1,2}\.\d{1,2}\.\d{2,4})/i.exec(rahmenHinweis);
+    const tpHeader = tpDateMatch ? `TP vom ${tpDateMatch[1]}` : 'TP von / TP bis';
+    rahmenBody += `<h3 class="section">Rahmentermine</h3>
+      ${rahmenHinweis ? `<div class="section-note">${escapeHtml(rahmenHinweis)}</div>` : ''}
+      <table class="rahmen-table">
+        <colgroup><col class="c-haus"><col class="c-gewerk"><col class="c-tpvon"><col class="c-tpbis"><col class="c-stand"><col class="c-proz"><col class="c-ampel"><col class="c-prognose"></colgroup>
+        <tr><th>Haus</th><th>Gewerk</th><th colspan="2">${escapeHtml(tpHeader)}</th><th colspan="3">Bautenstand</th><th>Prognose</th></tr>
+        ${rahmenRows.length > 0 ? rahmenRows.map(r => {
+          const [haus='', gewerk='', tpVon='', tpBis='', bautenstand='', prozent='', status='', prognose=''] = r;
+          const swatchColor = RAHMEN_SWATCH_COLOR[status] || '';
+          const muted = !status ? ' muted' : '';
+          return `<tr><td class="haus">${escapeHtml(haus)}</td><td>${escapeHtml(gewerk)}</td><td>${escapeHtml(tpVon)}</td><td>${escapeHtml(tpBis)}</td><td class="${muted.trim()}">${escapeHtml(bautenstandLabel(bautenstand))}</td><td class="num${muted}">${prozent !== '' ? escapeHtml(prozent) : ''}</td><td class="status-cell">${swatchColor ? `<i class="status-swatch" style="background:${swatchColor}"></i>` : ''}</td><td>${escapeHtml(prognose)}</td></tr>`;
+        }).join('') : Array.from({length:12}).map(() => `<tr class="blank-row"><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`).join('')}
+      </table>
+      <div class="ampel-legende">
+        <span><i style="background:#8FAF6E"></i>Termin unkritisch</span>
+        <span><i style="background:#E0903C"></i>Termin kritisch</span>
+        <span><i style="background:#D9463B"></i>Termin überschritten</span>
+      </div>`;
+
+    // Verlauf vorheriger Berichte gehört (wie im Word-Dokument) auf die
+    // Rahmentermine-Seite, nicht auf die Dokumentationsseite.
+    if(verlaufEntries.length){
+      rahmenBody += `<h3 class="section">Verlauf vorheriger Berichte</h3>
+        <table class="doku-index"><colgroup><col style="width:70px"><col style="width:160px"><col></colgroup><tr><th>Nr.</th><th>Zeitraum</th><th>Zusammenfassung</th></tr>`;
+      verlaufEntries.forEach(v => {
+        const range = (v.von === v.bis) ? String(v.von) : `${v.von}–${v.bis}`;
+        const zeitraum = v.zeitraumVon === v.zeitraumBis ? v.zeitraumVon : `${v.zeitraumVon} – ${v.zeitraumBis}`;
+        rahmenBody += `<tr><td>${escapeHtml(range)}</td><td>QS-Bericht ${escapeHtml(String(v.berichtNr).padStart(3,'0'))} vom ${escapeHtml(zeitraum||'')}</td><td>${escapeHtml(v.zusammenfassung||'')}</td></tr>`;
+      });
+      rahmenBody += `</table>`;
+    }
+
+    toc.push({ title: 'Rahmentermine', page: pageCounter });
+    pages.push({ subtitle, body: rahmenBody });
+    pageCounter++;
   }
 
-  toc.push({ title: 'Rahmentermine', page: pageCounter });
-  pages.push({ subtitle: 'Leistungsfeststellung – Qualitätssicherung', body: rahmenBody });
-  pageCounter++;
+  // Im Kurzbericht entfällt die Rahmentermin-Seite; das Wetterband wandert
+  // in die Kopfzeile der ersten Dokumentationsseite (eine Zeile mit dem
+  // Abschnittstitel, damit der Tabellenkopf auf allen Seiten gleich hoch
+  // beginnt wie im QS-Bericht).
+  const kurzHeadRow = `<div class="doku-head-row"><h3 class="section">Dokumentation</h3>${wetterBandHtml}</div>`;
+  const dokuHead = kurz ? kurzHeadRow : `<h3 class="section">Dokumentation</h3>`;
 
   const startNr = getStartNr();
   const dokuGroups = chunk3(doku);
   if(doku.length === 0){
     toc.push({ title: 'Dokumentation', page: pageCounter });
-    pages.push({ subtitle: 'Leistungsfeststellung – Qualitätssicherung', body: `<h3 class="section">Dokumentation</h3><div class="empty">Keine Dokumentations-Einträge vorhanden.</div>` });
+    pages.push({ subtitle, body: dokuHead + `<div class="empty">Keine Dokumentations-Einträge vorhanden.</div>` });
     pageCounter++;
   } else {
     dokuGroups.forEach((group, gi) => {
-      let body = gi === 0 ? `<h3 class="section">Dokumentation</h3>` : '';
+      let body = gi === 0 ? dokuHead : '';
       const tblStyle = gi === 0 ? '' : ' style="margin-top:58.9px"';
       body += `<table class="doku-entries"${tblStyle}><colgroup><col class="c-nr"><col class="c-txt"><col class="c-foto"></colgroup><tr><th>Nr.</th><th>Feststellung</th><th>Foto</th></tr>`;
       group.forEach((e, j) => {
@@ -1912,14 +1967,14 @@ function renderReport(){
       });
       body += `</table>`;
       if(gi === 0) toc.push({ title: 'Dokumentation', page: pageCounter });
-      pages.push({ subtitle: 'Leistungsfeststellung – Qualitätssicherung', body });
+      pages.push({ subtitle, body });
       pageCounter++;
     });
   }
 
   const veranlGroups = chunk3(veranl);
   if(veranl.length === 0){
-    pages.push({ subtitle: 'Leistungsfeststellung – Qualitätssicherung', body: `<h3 class="section">Veranlassungen</h3><div class="empty">Keine Veranlassungen vorhanden.</div>` });
+    pages.push({ subtitle, body: `<h3 class="section">Veranlassungen</h3><div class="empty">Keine Veranlassungen vorhanden.</div>` });
     pageCounter++;
   } else {
     veranlGroups.forEach((group, gi) => {
@@ -1932,7 +1987,7 @@ function renderReport(){
         body += entryRow(letter, e, true);
       });
       body += `</table>`;
-      pages.push({ subtitle: 'Leistungsfeststellung – Qualitätssicherung', body });
+      pages.push({ subtitle, body });
       pageCounter++;
     });
   }
@@ -1940,15 +1995,15 @@ function renderReport(){
   const totalPages = pageCounter - 1;
 
   const coverBody = `
-    <div class="cover-title">Leistungsfeststellung – Qualitätssicherung</div>
+    <div class="cover-title">${kurz ? 'Baustellen-Kurzbericht' : 'Leistungsfeststellung – Qualitätssicherung'}</div>
     <table class="meta-table">
-      <tr><td class="k">Thema</td><td>Bericht zur Leistungsfeststellung – Qualitätssicherung</td></tr>
+      <tr><td class="k">Thema</td><td>${kurz ? 'Kurzbericht zum Bautenstand' : 'Bericht zur Leistungsfeststellung – Qualitätssicherung'}</td></tr>
       <tr class="gap"><td class="k">Verfasser</td><td>${escapeHtml(verfasser)}</td></tr>
       <tr><td class="k">Datum</td><td>${escapeHtml(datum)}</td></tr>
       <tr><td class="k">Seitenanzahl</td><td>${totalPages} Seiten</td></tr>
       <tr class="gap"><td class="k">Kunde</td><td>${escapeHtml(kunde)}</td></tr>
     </table>
-    <div class="rp-subhead">Verteiler</div>
+    ${kurz ? '' : `<div class="rp-subhead">Verteiler</div>
     <table class="verteiler-table">
       <colgroup><col class="c1"><col><col class="c3"><col class="c4"></colgroup>
       <tr><th>Name</th><th>Firma</th><th>Kürzel</th><th>E-Mail</th></tr>
@@ -1962,12 +2017,12 @@ function renderReport(){
     <div class="toc-block">
       <div class="rp-subhead">Inhaltsverzeichnis</div>
       ${toc.map(t => `<div class="toc-line"><span>${escapeHtml(t.title)}</span><span class="dots"></span><span class="pg">${t.page}</span></div>`).join('')}
-    </div>
+    </div>`}
   `;
 
   let html = `<div class="report-page">
     <div class="rp-header">
-      <div class="titles"><div class="t1">${escapeHtml(projekt)}</div><div class="t2">Leistungsfeststellung – Qualitätssicherung</div></div>
+      <div class="titles"><div class="t1">${escapeHtml(projekt)}</div><div class="t2">${subtitle}</div></div>
       <div class="logo-mark">${logoHtml}</div>
     </div>
     ${coverBody}
@@ -2031,7 +2086,8 @@ async function exportPdf(){
       if(i > 0) pdf.addPage();
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
     }
-    const filename = (document.getElementById('rDateiname').value.trim() || autoDateinameFromInputs() || 'qs-bericht.docx').replace(/\.docx$/i, '.pdf');
+    let filename = (document.getElementById('rDateiname').value.trim() || autoDateinameFromInputs() || 'qs-bericht.docx').replace(/\.docx$/i, '.pdf');
+    if(berichtsModus === 'kurz') filename = filename.replace(/QS-Bericht/i, 'Kurzbericht');
     pdf.save(filename);
     hint.textContent = 'Fertig — "' + filename + '" wurde heruntergeladen.';
   }catch(err){
