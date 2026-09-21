@@ -95,13 +95,17 @@
   .edit-group h3:first-child{ margin-top:0; }
   .edit-row{ display:flex; gap:10px; padding:12px 0; border-bottom:1px solid var(--concrete-2); }
   .edit-thumb img{ width:130px; height:130px; object-fit:contain; background:var(--concrete-2); border-radius:3px; border:1px solid var(--line); cursor:zoom-in; }
-  .edit-fields{ flex:1; display:flex; flex-direction:column; gap:6px; }
+  .edit-fields{ flex:1; display:flex; flex-direction:column; gap:10px; }
   .edit-fields input, .edit-fields textarea{ padding:7px 8px; font-size:13px; margin:0; }
   .edit-fields textarea{ min-height:44px; }
+  .edit-fields label{ display:block; font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.02em; margin:0 0 3px; }
+  .edit-fields .field-block{ display:flex; flex-direction:column; }
+  .edit-bottom-row{ display:flex; align-items:flex-end; justify-content:space-between; gap:14px; flex-wrap:wrap; }
+  .edit-datum input{ width:130px; }
   .edit-row{ align-items:flex-start; }
   .badge.orange{ background:var(--orange); color:var(--white); }
   .badge.green{ background:var(--green); color:var(--white); }
-  .edit-status{ margin-bottom:6px; }
+  .edit-status{ margin-bottom:0; }
   .edit-count{ font-weight:400; text-transform:none; letter-spacing:0; color:var(--muted); font-size:12px; }
   .editor-toolbar{ display:flex; justify-content:flex-end; margin-bottom:4px; }
   .editor-toolbar button{ width:auto; }
@@ -120,9 +124,11 @@
   @media (min-width:860px){
     .container{ max-width:1120px; }
     #view-report .edit-row{ display:grid; grid-template-columns:auto 300px 1fr; gap:18px; align-items:start; padding:18px 0; }
-    #view-report .edit-thumb img{ width:300px; height:300px; }    #view-report .edit-fields{ display:grid; grid-template-columns:1fr 1fr; gap:8px 14px; }
-    #view-report .edit-fields textarea{ grid-column:1 / -1; min-height:90px; }
-    #view-report .edit-status, #view-report .edit-actions{ grid-column:1 / -1; }
+    #view-report .edit-thumb img{ width:300px; height:300px; }
+    #view-report .edit-fields{ display:grid; grid-template-columns:1fr 1fr; gap:10px 14px; }
+    #view-report .edit-fields .row2{ grid-column:1 / -1; display:grid; grid-template-columns:1fr 1fr; gap:0 14px; }
+    #view-report .edit-fields textarea{ min-height:90px; }
+    #view-report .edit-status, #view-report .edit-fields .field-block, #view-report .edit-bottom-row{ grid-column:1 / -1; }
   }
   .drag-handle{ width:26px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:18px; color:var(--muted); cursor:grab; touch-action:none; user-select:none; padding-top:14px; }
   .edit-row.dragging{ opacity:0.85; box-shadow:0 6px 16px rgba(0,0,0,0.18); background:var(--white); position:relative; z-index:5; }
@@ -1099,17 +1105,36 @@ async function importContinueFile(e){
     // für den Nutzer nicht nachvollziehbare Erkennung anhand eines leeren
     // Felds und funktionierte in der Praxis nicht zuverlässig.
     const map = new Map(allEntries.map(x => [x.id, x]));
-    importedEntries.forEach(x => { if(!map.has(x.id)) map.set(x.id, x); });
+    const newOnes = importedEntries.filter(x => !map.has(x.id));
+    // Neu hinzukommende Feststellungen werden als Block HINTER die in dieser
+    // Sitzung bereits vorhandenen angehängt (statt sich je nach rohem
+    // Zeitstempel evtl. dazwischenzuschieben) - getrennt je Feststellungsart
+    // (Dokumentation/Veranlassungen), die Reihenfolge UNTEREINANDER aus der
+    // importierten Datei bleibt dabei erhalten.
+    const maxSortOrderByType = {};
+    allEntries.forEach(x => {
+      const t = x.type || 'doku';
+      maxSortOrderByType[t] = Math.max(maxSortOrderByType[t] || 0, x.sortOrder || 0);
+    });
+    const newOnesSorted = newOnes.slice().sort((a,b) => (a.sortOrder||0) - (b.sortOrder||0));
+    const appendCounter = {};
+    newOnesSorted.forEach(x => {
+      const t = x.type || 'doku';
+      if(maxSortOrderByType[t] === undefined) maxSortOrderByType[t] = 0;
+      appendCounter[t] = (appendCounter[t] || 0) + 1;
+      x.sortOrder = maxSortOrderByType[t] + appendCounter[t];
+    });
+    newOnesSorted.forEach(x => map.set(x.id, x));
     allEntries = Array.from(map.values());
     renderRecent();
-    importedEntries.forEach(x => idbPutEntry(x));
+    newOnesSorted.forEach(x => idbPutEntry(x));
 
     importedVerlauf.forEach(v => {
       if(!verlaufEntries.some(x => x.von === v.von && x.bis === v.bis)) verlaufEntries.push(v);
     });
     if(importedVerlauf.length){ renderVerlauf(); idbPutMeta('verlauf', verlaufEntries); }
 
-    setConnStatus(true, importedEntries.length + ' Einträge geladen — insgesamt jetzt ' + allEntries.length + ' in dieser Sammlung.');
+    setConnStatus(true, newOnesSorted.length + ' neue Einträge geladen — insgesamt jetzt ' + allEntries.length + ' in dieser Sammlung.');
 
     // Berichtskopf nur uebernehmen, wenn die Felder noch leer sind (eigene,
     // bereits eingetragene Werte in dieser Sitzung nicht ueberschreiben).
@@ -1152,49 +1177,94 @@ function setType(t){
 // Versionen (das war zeitweise sogar ein bekannter WebKit-Regressions-Bug). Deshalb wird
 // die Ausrichtung hier immer explizit selbst korrigiert, statt sich auf das Browser-
 // Verhalten zu verlassen — dadurch sieht das Foto (und die Position des Zeitstempels)
-// auf jedem Gerät gleich aus.
+// auf jedem Gerät gleich aus. Im selben Durchgang wird - falls vorhanden - auch das
+// EXIF-Aufnahmedatum (DateTimeOriginal, das "Uhrfeld" der Kamera) ausgelesen, damit der
+// Stand jeder Feststellung automatisch dem tatsächlichen Aufnahmezeitpunkt entspricht.
 
-function getExifOrientation(buffer){
+function getExifMeta(buffer){
+  const result = { orientation: 1, dateTimeOriginal: null };
   const view = new DataView(buffer);
-  if(view.byteLength < 4 || view.getUint16(0, false) !== 0xFFD8) return 1; // kein JPEG
+  if(view.byteLength < 4 || view.getUint16(0, false) !== 0xFFD8) return result; // kein JPEG
   const length = view.byteLength;
   let offset = 2;
   while(offset + 4 <= length){
     const marker = view.getUint16(offset, false);
     if(marker === 0xFFE1){ // APP1 (EXIF)
-      if(offset + 10 > length || view.getUint32(offset + 4, false) !== 0x45786966) return 1; // "Exif"
+      if(offset + 10 > length || view.getUint32(offset + 4, false) !== 0x45786966) return result; // "Exif"
       const tiffOffset = offset + 10;
-      if(tiffOffset + 8 > length) return 1;
+      if(tiffOffset + 8 > length) return result;
       const little = view.getUint16(tiffOffset, false) === 0x4949;
+
+      function readAscii(valOffset, count){
+        let s = '';
+        for(let k = 0; k < count - 1; k++){ // letztes Byte ist der Null-Terminator
+          if(valOffset + k >= length) break;
+          s += String.fromCharCode(view.getUint8(valOffset + k));
+        }
+        return s;
+      }
+
+      function parseIFD(ifdOffset){
+        const entries = {};
+        if(ifdOffset < 0 || ifdOffset + 2 > length) return entries;
+        const num = view.getUint16(ifdOffset, little);
+        for(let i = 0; i < num; i++){
+          const entryOffset = ifdOffset + 2 + i * 12;
+          if(entryOffset + 12 > length) break;
+          entries[view.getUint16(entryOffset, little)] = {
+            type: view.getUint16(entryOffset + 2, little),
+            count: view.getUint32(entryOffset + 4, little),
+            valOffsetField: entryOffset + 8
+          };
+        }
+        return entries;
+      }
+
+      function getAscii(entry){
+        if(!entry) return null;
+        const dataOffset = entry.count <= 4 ? entry.valOffsetField : tiffOffset + view.getUint32(entry.valOffsetField, little);
+        return readAscii(dataOffset, entry.count);
+      }
+
       const firstIFDOffset = view.getUint32(tiffOffset + 4, little);
-      const dirOffset = tiffOffset + firstIFDOffset;
-      if(dirOffset + 2 > length) return 1;
-      const entries = view.getUint16(dirOffset, little);
-      for(let i = 0; i < entries; i++){
-        const entryOffset = dirOffset + 2 + i * 12;
-        if(entryOffset + 10 > length) break;
-        if(view.getUint16(entryOffset, little) === 0x0112){
-          return view.getUint16(entryOffset + 8, little);
+      const ifd0 = parseIFD(tiffOffset + firstIFDOffset);
+
+      if(ifd0[0x0112]) result.orientation = view.getUint16(ifd0[0x0112].valOffsetField, little);
+
+      // Bevorzugt DateTimeOriginal (0x9003) aus dem Exif-Unterverzeichnis
+      // (0x8769) - das eigentliche Aufnahmedatum der Kamera; fällt sonst auf
+      // DateTimeDigitized oder das allgemeine DateTime-Feld in IFD0 zurück.
+      let dt = getAscii(ifd0[0x0132]);
+      if(ifd0[0x8769]){
+        const exifIFD = parseIFD(tiffOffset + view.getUint32(ifd0[0x8769].valOffsetField, little));
+        dt = getAscii(exifIFD[0x9003]) || getAscii(exifIFD[0x9004]) || dt;
+      }
+      if(dt){
+        const m = /^(\d{4}):(\d{2}):(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/.exec(dt.trim());
+        if(m){
+          const d = new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5], +m[6]);
+          if(!isNaN(d.getTime())) result.dateTimeOriginal = d;
         }
       }
-      return 1;
+      return result;
     } else if((marker & 0xFF00) !== 0xFF00){
       break;
     } else {
       offset += 2 + view.getUint16(offset + 2, false);
     }
   }
-  return 1;
+  return result;
 }
 
-// Liefert ein bereits korrekt ausgerichtetes Canvas (Breite/Höhe entsprechen der
-// sichtbaren, aufrechten Ausrichtung des Fotos).
+// Liefert das bereits korrekt ausgerichtete Canvas sowie (falls vorhanden) das
+// EXIF-Aufnahmedatum des Fotos.
 function loadOrientedImage(file){
   return new Promise((resolve, reject) => {
     const exifReader = new FileReader();
     exifReader.onload = function(exifEv){
-      let orientation = 1;
-      try{ orientation = getExifOrientation(exifEv.target.result); }catch(err){ orientation = 1; }
+      let meta = { orientation: 1, dateTimeOriginal: null };
+      try{ meta = getExifMeta(exifEv.target.result); }catch(err){ /* kein/ungültiges EXIF - Fallback bleibt aktiv */ }
+      const orientation = meta.orientation;
 
       const blobUrl = URL.createObjectURL(file);
       const img = new Image();
@@ -1217,7 +1287,7 @@ function loadOrientedImage(file){
         }
         ctx.drawImage(img, 0, 0, iw, ih);
         URL.revokeObjectURL(blobUrl);
-        resolve(canvas);
+        resolve({ canvas, exifDate: meta.dateTimeOriginal });
       };
       img.onerror = function(){ URL.revokeObjectURL(blobUrl); reject(new Error('Bild konnte nicht geladen werden.')); };
       img.src = blobUrl;
@@ -1281,8 +1351,17 @@ async function processPhotoFiles(files){
 // Vollversion erzeugen, als neue Feststellung speichern. Gibt ein Promise
 // zurueck, das erst nach vollstaendigem Speichern (inkl. Galerie) aufgeloest wird.
 function processSinglePhoto(file, sortOrder){
-  return loadOrientedImage(file).then(function(oriented){
+  return loadOrientedImage(file).then(function(result){
+    const oriented = result.canvas;
     const fullW = oriented.width, fullH = oriented.height;
+
+    // Stand-Datum der Feststellung: bevorzugt aus dem EXIF-Aufnahmedatum des
+    // Fotos (dem "Uhrfeld" der Kamera - wann das Foto tatsächlich gemacht
+    // wurde), sonst aus dem Änderungsdatum der Datei, sonst heutiges Datum.
+    // Bleibt in der Berichtsseite jederzeit manuell änderbar.
+    const capturedAt = result.exifDate || (file.lastModified ? new Date(file.lastModified) : new Date());
+    const entryDatum = capturedAt.toLocaleDateString('de-DE');
+    const entryDatumISO = capturedAt.toISOString().slice(0,10);
 
     function drawTimestamp(ctx, w, h){
       if(!document.getElementById('fTimestamp').checked) return;
@@ -1344,11 +1423,10 @@ function processSinglePhoto(file, sortOrder){
           // gespeichert - Gewerk/Ort/Info etc. werden erst später auf der
           // Berichtsseite eingetragen.
           const entryId = 'e_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
-          const nowIso = new Date().toISOString().slice(0,10);
           const entry = {
             id: entryId, type: currentType, gewerk: '', ort: '', arbeiten: '',
             bauteil: '', material: '', verantwortlich: '',
-            datum: todayStr(), datumISO: nowIso, bearbeitet: false,
+            datum: entryDatum, datumISO: entryDatumISO, bearbeitet: false,
             sortOrder, photoUrl: previewDataUrl, photoPrintUrl: printDataUrl, createdAt: Date.now()
           };
           allEntries.push(entry);
@@ -1754,15 +1832,17 @@ function renderEditor(){
       <div class="edit-fields">
         <div class="edit-status">${e.bearbeitet ? '<span class="badge green">Gespeichert</span>' : '<span class="badge orange">Noch nicht bearbeitet</span>'}</div>
         <div class="row2">
-          <input type="text" id="ed_gewerk_${e.id}" value="${escapeHtml(e.gewerk)}" placeholder="Gewerk">
-          <input type="text" id="ed_bauteil_${e.id}" value="${escapeHtml(e.bauteil||'')}" placeholder="Bauteil">
+          <div><label>Gewerk</label><input type="text" id="ed_gewerk_${e.id}" value="${escapeHtml(e.gewerk)}" placeholder="z. B. Rohbau"></div>
+          <div><label>Bauteil</label><input type="text" id="ed_bauteil_${e.id}" value="${escapeHtml(e.bauteil||'')}" placeholder="z. B. Wände EG"></div>
         </div>
-        <textarea id="ed_arbeiten_${e.id}" placeholder="Info (bei Bedarf inkl. Material)">${escapeHtml(e.arbeiten||'')}</textarea>
-        ${e.type==='veranlassung' ? `<input type="text" id="ed_verantwortlich_${e.id}" value="${escapeHtml(e.verantwortlich||'')}" placeholder="Verantwortlichkeit">` : ''}
-        <input type="text" id="ed_datum_${e.id}" value="${escapeHtml(e.datum)}" placeholder="Datum">
-        <div class="edit-actions">
-          <button class="btn-secondary small" onclick="saveEntryEdit('${e.id}')">Speichern</button>
-          <button class="del-btn" onclick="deleteEntry('${e.id}')">Löschen</button>
+        <div class="field-block"><label>Info</label><textarea id="ed_arbeiten_${e.id}" placeholder="bei Bedarf inkl. Material">${escapeHtml(e.arbeiten||'')}</textarea></div>
+        ${e.type==='veranlassung' ? `<div class="field-block"><label>Verantwortlichkeit</label><input type="text" id="ed_verantwortlich_${e.id}" value="${escapeHtml(e.verantwortlich||'')}" placeholder="z. B. Fa. Musterbau GmbH"></div>` : ''}
+        <div class="edit-bottom-row">
+          <div class="edit-datum"><label>Datum</label><input type="text" id="ed_datum_${e.id}" value="${escapeHtml(e.datum)}" placeholder="TT.MM.JJJJ"></div>
+          <div class="edit-actions">
+            <button class="btn-secondary small" onclick="saveEntryEdit('${e.id}')">Speichern</button>
+            <button class="del-btn" onclick="deleteEntry('${e.id}')">Löschen</button>
+          </div>
         </div>
       </div>
     </div>
@@ -1790,18 +1870,47 @@ function closeLightbox(){
 // getrennt); der gezogene Eintrag wird vor dem Zieleintrag einsortiert und
 // alle sortOrder-Werte der betroffenen Gruppe danach neu, fortlaufend vergeben.
 let dragEntryId = null;
+let lastDragClientY = null;
+let autoScrollActive = false;
+
+// Waehrend des Ziehens automatisch scrollen, sobald der Zeiger nahe am
+// oberen/unteren Rand des sichtbaren Bereichs ist - sonst laesst sich per
+// Maus nur innerhalb des aktuell sichtbaren Ausschnitts verschieben (die
+// Seite bewegt sich beim Ziehen von Haus aus nicht mit).
+function autoScrollStep(){
+  if(!autoScrollActive) return;
+  if(lastDragClientY != null){
+    const margin = 110, maxSpeed = 24;
+    let dy = 0;
+    if(lastDragClientY < margin) dy = -maxSpeed * (1 - lastDragClientY / margin);
+    else if(lastDragClientY > window.innerHeight - margin) dy = maxSpeed * (1 - (window.innerHeight - lastDragClientY) / margin);
+    if(dy) window.scrollBy(0, dy);
+  }
+  requestAnimationFrame(autoScrollStep);
+}
+// Verfolgt die Zeigerposition waehrend des gesamten Ziehvorgangs, auch
+// wenn der Zeiger kurz ueber einem Bereich ausserhalb der Listenzeilen
+// steht (z. B. beim Ziehen ganz an den Seitenrand).
+document.addEventListener('dragover', e => {
+  if(dragEntryId){ lastDragClientY = e.clientY; }
+});
 
 function handleDragStart(e, id){
   dragEntryId = id;
   e.dataTransfer.effectAllowed = 'move';
   try{ e.dataTransfer.setData('text/plain', id); }catch(err){}
   e.currentTarget.classList.add('dragging');
+  autoScrollActive = true;
+  lastDragClientY = e.clientY;
+  requestAnimationFrame(autoScrollStep);
 }
 
 function handleDragEnd(e){
   e.currentTarget.classList.remove('dragging');
   document.querySelectorAll('.edit-row.drag-over').forEach(el => el.classList.remove('drag-over'));
   dragEntryId = null;
+  autoScrollActive = false;
+  lastDragClientY = null;
 }
 
 function handleDragOver(e){
