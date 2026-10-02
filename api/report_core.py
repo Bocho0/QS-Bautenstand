@@ -19,6 +19,7 @@ from docx.shared import Pt, Emu, Twips
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 from docx.oxml import parse_xml, OxmlElement
+from docx.text.paragraph import Paragraph
 from lxml import etree
 from xml.sax.saxutils import escape as xml_escape
 from PIL import Image
@@ -142,6 +143,33 @@ def set_cover_value(doc, label, value):
     return False
 
 
+def find_cover_paragraph(doc, label):
+    for p in doc.paragraphs:
+        if p.runs and p.runs[0].text.strip() == label:
+            return p
+    return None
+
+
+def insert_cover_field_after(after_para, label, value):
+    """Klont Formatierung (Schrift, Tabstopp, Hängeeinzug fürs mehrzeilige
+    Umbrechen) eines bestehenden Deckblatt-Feldes und fügt direkt danach
+    einen neuen Absatz mit eigenem Label/Wert ein - für optionale Felder,
+    die nicht fest in der Vorlage stehen (z. B. Generalunternehmer)."""
+    new_p_el = copy.deepcopy(after_para._p)
+    after_para._p.addnext(new_p_el)
+    new_para = Paragraph(new_p_el, after_para._parent)
+    runs = list(new_para.runs)
+    if runs:
+        runs[0].text = label
+        for extra in runs[1:]:
+            extra._r.getparent().remove(extra._r)
+    base_run = new_para.runs[0] if new_para.runs else None
+    r = new_para.add_run('\t' + value)
+    if base_run is not None:
+        set_run_font(r, base_run, color=COL_TEXT)
+    return new_para
+
+
 def set_seitenanzahl_field(doc, literal_total=None):
     """Setzt statt einer festen Zahl ein echtes Word-Feld (NUMPAGES) ein,
     damit die Seitenanzahl auch nach späteren Bearbeitungen in Word
@@ -219,7 +247,7 @@ def fill_verteiler(vt, verteiler_raw):
             if id(c._tc) not in seen:
                 unique_cells.append(c)
                 seen.add(id(c._tc))
-        for cell, val in zip(unique_cells, parts[:4]):
+        for col_idx, (cell, val) in enumerate(zip(unique_cells, parts[:4])):
             base_run = None
             for p in cell.paragraphs:
                 if p.runs:
@@ -229,7 +257,12 @@ def fill_verteiler(vt, verteiler_raw):
                 for r in list(p.runs):
                     r.text = ''
             target_p = cell.paragraphs[0]
-            r = target_p.add_run(val)
+            # In der E-Mail-Spalte kann der Nutzer bei langen Adressen
+            # gezielt einen Tabulator als Umbruchstelle einfuegen - wird hier
+            # in einen echten Zeilenumbruch uebersetzt (ein Word-Tabsprung
+            # waere an dieser Stelle nicht gemeint).
+            display_val = val.replace('\t', '\n') if col_idx == 3 else val
+            r = target_p.add_run(display_val)
             set_run_font(r, base_run, color=COL_TEXT)
     used = min(len(rows_text), len(vt.rows) - 1)
     for row in list(vt.rows[used + 1:]):
@@ -274,7 +307,11 @@ def fill_rahmentermine(rt, bk):
         haus, gewerk, tp_von, tp_bis, bautenstand_code, prozent, status, prognose = parts[:8]
         bautenstand_display = BAUTENSTAND_LABELS.get(bautenstand_code, bautenstand_code)
         prozent_display = f'{prozent}%' if prozent else ''
-        col_text = {0: haus, 1: gewerk, 2: tp_von, 3: tp_bis, 4: bautenstand_display,
+        # Spalte 0 = Gewerk, Spalte 1 = Bereich (vertauscht gegenueber der
+        # Reihenfolge im gespeicherten Datenformat haus;gewerk;... - das
+        # Format selbst bleibt unveraendert, nur die Anzeige-Spaltenreihenfolge
+        # wird getauscht).
+        col_text = {0: gewerk, 1: haus, 2: tp_von, 3: tp_bis, 4: bautenstand_display,
                     5: prozent_display, 7: prognose}
         fill = RAHMEN_COLOR.get(status.lower(), 'FFFFFF')
 
@@ -290,7 +327,7 @@ def fill_rahmentermine(rt, bk):
                     r.text = ''
             target_p = cell.paragraphs[0]
             r = target_p.add_run(val)
-            color = COL_MUTED_ID if col_idx == 0 else COL_TEXT
+            color = COL_MUTED_ID if col_idx == 1 else COL_TEXT
             set_run_font(r, base_run, color=color)
             if col_idx == 5:
                 target_p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
@@ -496,7 +533,7 @@ def build(template_path, data, out_path, tmp_dir='/tmp/report_photos', only_cont
     doc = docx.Document(template_path)
 
     verteiler_table = find_table_by_header(doc, 'Name')
-    rahmentermine_table = find_table_by_header(doc, 'Haus')
+    rahmentermine_table = find_table_by_header(doc, 'Gewerk')
     dokumentation_table = find_table_by_header(doc, 'Nr.')
 
     # ------------------------------------------------------------------
@@ -682,8 +719,18 @@ def build(template_path, data, out_path, tmp_dir='/tmp/report_photos', only_cont
     # ------------------------------------------------------------------
     set_cover_value(doc, 'Verfasser', bk.get('verfasser', ''))
     set_cover_value(doc, 'Datum', bk.get('datum', ''))
-    set_cover_value(doc, 'Kunde', bk.get('kunde', ''))
+    kunde_lines = [l.strip() for l in (bk.get('kunde', ''), bk.get('kundeStrasse', ''), bk.get('kundePlz', '')) if l and l.strip()]
+    set_cover_value(doc, 'Kunde', '\n'.join(kunde_lines))
     set_seitenanzahl_field(doc, literal_total=bk.get('combinedTotalPages'))
+
+    # Generalunternehmer ist optional - Absatz nur einfuegen, wenn mindestens
+    # eines der drei Felder befuellt ist; sonst bleibt das Deckblatt wie
+    # bisher ohne diese Zeile.
+    gu_lines = [l.strip() for l in (bk.get('generalunternehmer', ''), bk.get('generalunternehmerStrasse', ''), bk.get('generalunternehmerPlz', '')) if l and l.strip()]
+    if gu_lines:
+        kunde_p = find_cover_paragraph(doc, 'Kunde')
+        if kunde_p is not None:
+            insert_cover_field_after(kunde_p, 'Generalunternehmer', '\n'.join(gu_lines))
 
     # Verteiler
     fill_verteiler(verteiler_table, bk.get('verteiler', ''))
