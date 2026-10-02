@@ -720,7 +720,7 @@ def build(template_path, data, out_path, tmp_dir='/tmp/report_photos', only_cont
     set_cover_value(doc, 'Verfasser', bk.get('verfasser', ''))
     set_cover_value(doc, 'Datum', bk.get('datum', ''))
     kunde_lines = [l.strip() for l in (bk.get('kunde', ''), bk.get('kundeStrasse', ''), bk.get('kundePlz', '')) if l and l.strip()]
-    set_cover_value(doc, 'Kunde', '\n'.join(kunde_lines))
+    set_cover_value(doc, 'Bauherr', '\n'.join(kunde_lines))
     set_seitenanzahl_field(doc, literal_total=bk.get('combinedTotalPages'))
 
     # Generalunternehmer ist optional - Absatz nur einfuegen, wenn mindestens
@@ -728,7 +728,7 @@ def build(template_path, data, out_path, tmp_dir='/tmp/report_photos', only_cont
     # bisher ohne diese Zeile.
     gu_lines = [l.strip() for l in (bk.get('generalunternehmer', ''), bk.get('generalunternehmerStrasse', ''), bk.get('generalunternehmerPlz', '')) if l and l.strip()]
     if gu_lines:
-        kunde_p = find_cover_paragraph(doc, 'Kunde')
+        kunde_p = find_cover_paragraph(doc, 'Bauherr')
         if kunde_p is not None:
             insert_cover_field_after(kunde_p, 'Generalunternehmer', '\n'.join(gu_lines))
 
