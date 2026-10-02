@@ -62,6 +62,12 @@
   .btn-primary{ width:100%; background:var(--charcoal); color:var(--white); border:none; border-radius:var(--radius); font-family:'Archivo'; font-weight:800; font-size:16px; padding:15px; margin-top:18px; cursor:pointer; }
   .btn-primary:disabled{ background:var(--concrete-2); color:var(--muted); }
   .btn-secondary{ width:100%; background:var(--white); color:var(--charcoal); border:1.5px solid var(--charcoal); border-radius:var(--radius); font-family:'Inter'; font-weight:700; font-size:14px; padding:11px; cursor:pointer; }
+  /* Dezentere Variante speziell für den Export-Bereich - weniger "laut"
+     als die sonstigen Haupt-Buttons, da hier mehrere Optionen nebeneinander
+     stehen und nicht alle gleich stark betont werden müssen. */
+  .export-card{ background:var(--concrete-2); border:none; box-shadow:none; }
+  .btn-export{ width:100%; background:var(--white); color:var(--charcoal); border:1px solid var(--line); border-radius:var(--radius); font-family:'Inter'; font-weight:600; font-size:13.5px; padding:10px; cursor:pointer; }
+  .btn-export:hover{ background:var(--concrete-2); }
   .btn-secondary.small{ width:auto; padding:7px 12px; font-size:12px; }
   .hint{ font-size:12px; color:var(--muted); margin-top:6px; }
   .row2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
@@ -87,6 +93,11 @@
   .conn-status.bad{ background:#FBEFEE; color:var(--rust); }
   .conn-status.bad .dot{ background:var(--rust); }
   .report-meta{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  /* .report-meta setzt explizit display:grid - das überstimmt sonst das
+     native Ausblenden von Inhalten in einem geschlossenen <details>
+     (Autor-Regeln gewinnen gegenüber dem UA-Standardverhalten unabhängig
+     von der Spezifität). Deshalb hier explizit gegensteuern. */
+  details:not([open]) > .report-meta{ display:none; }
   .report-meta .full{ grid-column:1 / -1; }
   .report-meta .addr-sub{ margin-top:6px; }
   .opt-tag{ font-weight:400; text-transform:none; letter-spacing:0; color:var(--muted); font-size:11px; }
@@ -237,9 +248,14 @@
   table.verteiler-table tr.blank-row td{ height:1.4em; color:transparent; }
 
   /* Verteiler-Spalten: 38 / rest / 16 / 52 mm */
-  table.verteiler-table col.c1{ width:143.6px; }
-  table.verteiler-table col.c3{ width:60.5px; }
-  table.verteiler-table col.c4{ width:196.5px; }
+  table.verteiler-table col.c1{ width:122px; }
+  table.verteiler-table col.c3{ width:40px; }
+  table.verteiler-table col.c4{ width:238px; }
+  /* Ausweichlösung: falls eine E-Mail-Adresse ohne Bindestrich/Tab so lang
+     ist, dass sie selbst in der breiteren Spalte nicht umbrechen kann, wird
+     sie notfalls mitten im Wort umgebrochen statt über den Seitenrand
+     hinauszulaufen. */
+  table.verteiler-table td:last-child{ overflow-wrap:anywhere; }
 
   /* ---- Wetterband ---- */
   .wetter-band{
@@ -275,10 +291,10 @@
   table.rahmen-table col.c-tpbis{ width:64.3px; }
   table.rahmen-table col.c-stand{ width:98px; }
   table.rahmen-table col.c-proz{ width:30.2px; }
-  table.rahmen-table col.c-ampel{ width:13.2px; }
+  table.rahmen-table col.c-ampel{ width:22px; }
   table.rahmen-table col.c-prognose{ width:100px; }
   table.rahmen-table td.num{ text-align:right; padding-right:4px; }
-  table.rahmen-table td.status-cell{ width:13.2px; padding:6.4px 0; }
+  table.rahmen-table td.status-cell{ width:22px; padding:6.4px 6px 6.4px 2px; }
   .status-swatch{
     display:block; width:13.2px; height:14px; border:none; box-sizing:border-box;
   }
@@ -368,13 +384,8 @@
   <section id="view-capture" class="view active">
 
     <div class="card no-print">
-      <h2>Baustellenbesichtigung fortsetzen</h2>
-      <div class="hint">Fotos werden direkt in deine Fotogalerie gespeichert (Button "Galerie" bei jedem Eintrag). Die Textangaben bleiben in dieser Sitzung erhalten. Für einen Monatsbericht mit mehreren Besichtigungen: am Ende jeder Besichtigung unten im Bericht-Tab "1. Berichtsdaten herunterladen" — die Datei beim nächsten Termin hier wieder laden, dann geht es mit denselben Einträgen weiter.</div>
-      <label style="margin-top:14px">Vorherige Sitzung laden (fortsetzen)</label>
+      <label>Vorherige Sitzung laden (fortsetzen)</label>
       <input type="file" accept=".json" id="continueImportInput" onchange="importContinueFile(event)">
-
-      <button type="button" class="btn-secondary" style="margin-top:14px" onclick="exportForWordReport()">Baustellenbesuch beenden — Fotos als .json sichern</button>
-      <div class="hint">Direkt hier auf der Baustelle sichern, ohne in den Bericht-Tab zu wechseln. Die genauen Feststellungstexte trägst du später am Bildschirm im Büro ein (Tab „Bericht" → „Reihenfolge &amp; Text bearbeiten").</div>
     </div>
 
     <div class="card">
@@ -422,22 +433,29 @@
 
     <div class="card no-print">
       <h2>Berichtskopf</h2>
-      <div class="report-meta">
-        <div class="full"><label>Projekt / Baustelle</label><input type="text" id="rProjekt" placeholder="z. B. XY | München"></div>
-        <div><label>Baustellenbezeichnung</label><input type="text" id="rBaustelle" placeholder="z. B. Baustelle XY"></div>
-        <div class="full">
-          <label>Kunde</label>
-          <input type="text" id="rKunde" placeholder="Firma, Stadt">
-          <input type="text" id="rKundeStrasse" placeholder="Straße Hausnr. (optional)" class="addr-sub">
-          <input type="text" id="rKundePlz" placeholder="PLZ Ort (optional)" class="addr-sub">
+
+      <details class="help" id="projektdatenDetails">
+        <summary>Projekt- &amp; Kundendaten <span style="font-weight:400;color:var(--muted)">(einmalig pro Projekt)</span></summary>
+        <div class="report-meta" style="margin-top:10px">
+          <div class="full"><label>Projekt / Baustelle</label><input type="text" id="rProjekt" placeholder="z. B. XY | München"></div>
+          <div><label>Baustellenbezeichnung</label><input type="text" id="rBaustelle" placeholder="z. B. Baustelle XY"></div>
+          <div class="full">
+            <label>Bauherr</label>
+            <input type="text" id="rKunde" placeholder="Firma, Stadt">
+            <input type="text" id="rKundeStrasse" placeholder="Straße Hausnr. (optional)" class="addr-sub">
+            <input type="text" id="rKundePlz" placeholder="PLZ Ort (optional)" class="addr-sub">
+          </div>
+          <div class="full">
+            <label>Generalunternehmer <span class="opt-tag">optional</span></label>
+            <input type="text" id="rGU" placeholder="Firma, Stadt">
+            <input type="text" id="rGUStrasse" placeholder="Straße Hausnr. (optional)" class="addr-sub">
+            <input type="text" id="rGUPlz" placeholder="PLZ Ort (optional)" class="addr-sub">
+          </div>
+          <div><label>Verfasser (Kürzel)</label><input type="text" id="rVerfasser" placeholder="z. B. NFM"></div>
         </div>
-        <div class="full">
-          <label>Generalunternehmer <span class="opt-tag">optional</span></label>
-          <input type="text" id="rGU" placeholder="Firma, Stadt">
-          <input type="text" id="rGUStrasse" placeholder="Straße Hausnr. (optional)" class="addr-sub">
-          <input type="text" id="rGUPlz" placeholder="PLZ Ort (optional)" class="addr-sub">
-        </div>
-        <div><label>Verfasser (Kürzel)</label><input type="text" id="rVerfasser" placeholder="z. B. NFM"></div>
+      </details>
+
+      <div class="report-meta" style="margin-top:14px">
         <div><label>Datum Bericht</label><input type="text" id="rDatum" placeholder="TT.MM.JJJJ"></div>
         <div>
           <label>Berichts-Nr. <button type="button" class="wetter-btn" onclick="startNewReportInReihe()" title="Aktuelle Feststellungen als Kurzdarstellung ablegen und Berichts-Nr. erhöhen">➜ neuer Bericht</button></label>
@@ -488,14 +506,11 @@
       </div>
     </div>
 
-    <div class="card no-print">
-      <button class="btn-primary" onclick="exportPdf()" id="genPdfBtn">PDF exportieren</button>
-      <div class="hint" id="genPdfHint">Erstellt direkt eine PDF-Datei aus der aktuellen Vorschau unten — die Vorschau wird davor automatisch aktualisiert. Diese PDF enthält gerasterte Seiten (wie ein Foto/Scan) und lässt sich in PDF-Programmen daher nicht als Text bearbeiten.</div>
+    <div class="card no-print export-card">
+      <button class="btn-export" onclick="exportPdf()" id="genPdfBtn">PDF exportieren</button>
+      <div class="hint" id="genPdfHint">Erstellt direkt eine PDF-Datei aus der aktuellen Vorschau unten — die Vorschau wird davor automatisch aktualisiert.</div>
 
-      <button class="btn-secondary" style="margin-top:10px" onclick="printReport()" id="printPdfBtn">Als bearbeitbare PDF drucken …</button>
-      <div class="hint">Öffnet den Druckdialog des Browsers; dort als Ziel „Als PDF speichern" wählen. Anders als beim PDF-Export oben enthält das Ergebnis echten, auswählbaren Text und lässt sich z. B. in PDF-XChange Editor bearbeiten. Tipp: Unter „Weitere Einstellungen" im Druckdialog die Kopf-/Fußzeilen des Browsers abschalten, sonst erscheinen dort zusätzlich Datum/Dateipfad.</div>
-
-      <button class="btn-secondary" style="margin-top:10px" onclick="exportForWordReport()" id="genJsonBtn">Berichtsdaten herunterladen (.json)</button>
+      <button class="btn-export" style="margin-top:10px" onclick="exportForWordReport()" id="genJsonBtn">Berichtsdaten herunterladen (.json)</button>
       <div class="hint">Zum Fortführen dieser Baustelle beim nächsten Termin oder im nächsten Bericht wieder hochladen (Tab „Erfassen" → „Vorherige Sitzung laden") — dient außerdem als Sicherung und lässt sich alternativ im Chat mit Claude zu einem Word-Bericht verarbeiten.</div>
 
       <details class="help" style="margin-top:14px">
@@ -2201,8 +2216,8 @@ function renderReport(){
       <tr class="gap"><td class="k">Verfasser</td><td>${escapeHtml(verfasser)}</td></tr>
       <tr><td class="k">Datum</td><td>${escapeHtml(datum)}</td></tr>
       <tr><td class="k">Seitenanzahl</td><td>${totalPages} Seiten</td></tr>
-      <tr class="gap"><td class="k">Kunde</td><td>${kundeLines.map(escapeHtml).join('<br>')}</td></tr>
-      ${guLines.length ? `<tr><td class="k">Generalunternehmer</td><td>${guLines.map(escapeHtml).join('<br>')}</td></tr>` : ''}
+      <tr class="gap"><td class="k">Bauherr</td><td>${kundeLines.map(escapeHtml).join('<br>')}</td></tr>
+      ${guLines.length ? `<tr class="gap"><td class="k">Generalunternehmer</td><td>${guLines.map(escapeHtml).join('<br>')}</td></tr>` : ''}
     </table>
     ${kurz ? '' : `<div class="rp-subhead">Verteiler</div>
     <table class="verteiler-table">
@@ -2241,19 +2256,6 @@ function renderReport(){
   });
 
   document.getElementById('reportOutput').innerHTML = html;
-}
-
-// Alternative zu exportPdf(): nutzt den nativen Druckdialog des Browsers
-// (window.print()) statt html2canvas-Rasterung. Das Ergebnis ("Als PDF
-// speichern" im Druckdialog) enthält echten, auswählbaren/bearbeitbaren
-// Text statt eines Seitenfotos - auf Kosten eines manuellen Dialogschritts
-// und ggf. sichtbarer Browser-Kopf-/Fußzeilen (siehe Hinweistext im UI).
-function printReport(){
-  if(allEntries.length === 0){ alert('Noch keine Feststellungen erfasst.'); return; }
-  switchTab('report');
-  // Einen Frame abwarten, damit der (frisch aufgebaute) Bericht sicher im
-  // DOM steht, bevor der Druckdialog den aktuellen Zustand erfasst.
-  requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
 }
 
 // Erstellt eine echte PDF-Datei direkt im Browser (kein window.print()) -
