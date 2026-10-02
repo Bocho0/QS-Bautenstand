@@ -65,6 +65,7 @@
   .btn-secondary.small{ width:auto; padding:7px 12px; font-size:12px; }
   .hint{ font-size:12px; color:var(--muted); margin-top:6px; }
   .row2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .row2.row3{ grid-template-columns:repeat(3, 1fr); }
   .recent-item{ display:flex; gap:10px; padding:10px 0; border-bottom:1px solid var(--concrete-2); align-items:center; }
   .recent-item:last-child{ border-bottom:none; }
   .recent-item img{ width:110px; height:110px; object-fit:contain; border-radius:3px; flex-shrink:0; background:var(--concrete-2); }
@@ -87,6 +88,8 @@
   .conn-status.bad .dot{ background:var(--rust); }
   .report-meta{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   .report-meta .full{ grid-column:1 / -1; }
+  .report-meta .addr-sub{ margin-top:6px; }
+  .opt-tag{ font-weight:400; text-transform:none; letter-spacing:0; color:var(--muted); font-size:11px; }
   .logo-upload{ display:flex; align-items:center; gap:10px; margin-top:8px; }
   .logo-upload img{ height:34px; }
   .actionbar{ display:flex; gap:10px; margin-bottom:14px; }
@@ -127,6 +130,7 @@
     #view-report .edit-thumb img{ width:300px; height:300px; }
     #view-report .edit-fields{ display:grid; grid-template-columns:1fr 1fr; gap:10px 14px; }
     #view-report .edit-fields .row2{ grid-column:1 / -1; display:grid; grid-template-columns:1fr 1fr; gap:0 14px; }
+    #view-report .edit-fields .row2.row3{ grid-template-columns:repeat(3, 1fr); }
     #view-report .edit-fields textarea{ min-height:90px; }
     #view-report .edit-status, #view-report .edit-fields .field-block, #view-report .edit-bottom-row{ grid-column:1 / -1; }
   }
@@ -193,7 +197,7 @@
     width:100%; border-collapse:collapse; font-size:12px;
     margin:45.4px 0 0;                   /* 12mm */
   }
-  table.meta-table td{ padding:1.6px 0; vertical-align:baseline; border:none; }
+  table.meta-table td{ padding:1.6px 0; vertical-align:top; border:none; line-height:1.5; }
   table.meta-table td.k{
     width:98px;                          /* 26mm */
     color:#7A7A7A; text-decoration:none; /* KEINE Unterstreichung */
@@ -269,10 +273,10 @@
   table.rahmen-table col.c-gewerk{ width:auto; }
   table.rahmen-table col.c-tpvon{ width:64.3px; }
   table.rahmen-table col.c-tpbis{ width:64.3px; }
-  table.rahmen-table col.c-stand{ width:114px; }
+  table.rahmen-table col.c-stand{ width:98px; }
   table.rahmen-table col.c-proz{ width:30.2px; }
   table.rahmen-table col.c-ampel{ width:13.2px; }
-  table.rahmen-table col.c-prognose{ width:60px; }
+  table.rahmen-table col.c-prognose{ width:100px; }
   table.rahmen-table td.num{ text-align:right; padding-right:4px; }
   table.rahmen-table td.status-cell{ width:13.2px; padding:6.4px 0; }
   .status-swatch{
@@ -334,10 +338,11 @@
     box-sizing:border-box; overflow:hidden; margin:0; border:none;
   }
   @media print{
+    @page{ size:A4; margin:0; }
     body{ background:white; padding-bottom:0; }
     header.top, nav.tabbar, .no-print{ display:none !important; }
     .container{ max-width:100%; padding:0; }
-    .report-page{ border:none; page-break-after:always; margin:0; }
+    .report-page{ border:none; page-break-after:always; margin:0; width:210mm; min-height:297mm; }
   }
   /* Hilfetext-Boxen der App-Oberfläche (nicht Teil der Berichtsvorschau) */
   details.help{ margin-top:8px; }
@@ -420,7 +425,18 @@
       <div class="report-meta">
         <div class="full"><label>Projekt / Baustelle</label><input type="text" id="rProjekt" placeholder="z. B. XY | München"></div>
         <div><label>Baustellenbezeichnung</label><input type="text" id="rBaustelle" placeholder="z. B. Baustelle XY"></div>
-        <div><label>Kunde</label><input type="text" id="rKunde" placeholder="Kundenname"></div>
+        <div class="full">
+          <label>Kunde</label>
+          <input type="text" id="rKunde" placeholder="Firma, Stadt">
+          <input type="text" id="rKundeStrasse" placeholder="Straße Hausnr. (optional)" class="addr-sub">
+          <input type="text" id="rKundePlz" placeholder="PLZ Ort (optional)" class="addr-sub">
+        </div>
+        <div class="full">
+          <label>Generalunternehmer <span class="opt-tag">optional</span></label>
+          <input type="text" id="rGU" placeholder="Firma, Stadt">
+          <input type="text" id="rGUStrasse" placeholder="Straße Hausnr. (optional)" class="addr-sub">
+          <input type="text" id="rGUPlz" placeholder="PLZ Ort (optional)" class="addr-sub">
+        </div>
         <div><label>Verfasser (Kürzel)</label><input type="text" id="rVerfasser" placeholder="z. B. NFM"></div>
         <div><label>Datum Bericht</label><input type="text" id="rDatum" placeholder="TT.MM.JJJJ"></div>
         <div>
@@ -438,7 +454,7 @@
       <div id="rahmenVerteilerBlock">
       <details class="help" style="margin-top:14px" open>
         <summary>Rahmentermine festlegen (einmalig pro Projekt)</summary>
-        <div class="ex" style="font-family:inherit;white-space:normal">Hier einmal zu Projektbeginn Bereich, Gewerk und die Ausführung nach TP (von/bis) je Zeile anlegen. Bei jedem weiteren Bericht müssen dann nur noch Bautenstand, Prozent, Pünktlichkeit und ggf. Prognose unten aktualisiert werden — die Liste selbst bleibt gleich.</div>
+        <div class="ex" style="font-family:inherit;white-space:normal">Hier einmal zu Projektbeginn Gewerk, Bereich und die Ausführung nach TP (von/bis) je Zeile anlegen. Bei jedem weiteren Bericht müssen dann nur noch Bautenstand, Prozent, Pünktlichkeit und ggf. Prognose unten aktualisiert werden — die Liste selbst bleibt gleich.</div>
         <label style="margin-top:12px">Hinweistext über der Tabelle <span style="font-weight:400;color:var(--muted)">(projektspezifisch, erscheint im Bericht — z. B. auf welchen Terminplan sich „TP vom" bezieht)</span></label>
         <input type="text" id="rRahmenHinweis" placeholder="z. B. Hinweis: TP vom 14.04.2026 ist der optimierte Detailterminplan (Best-Case-Szenario)">
         <div id="rahmenSetupEditor" style="margin-top:10px"></div>
@@ -474,7 +490,10 @@
 
     <div class="card no-print">
       <button class="btn-primary" onclick="exportPdf()" id="genPdfBtn">PDF exportieren</button>
-      <div class="hint" id="genPdfHint">Erstellt direkt eine PDF-Datei aus der aktuellen Vorschau unten — die Vorschau wird davor automatisch aktualisiert.</div>
+      <div class="hint" id="genPdfHint">Erstellt direkt eine PDF-Datei aus der aktuellen Vorschau unten — die Vorschau wird davor automatisch aktualisiert. Diese PDF enthält gerasterte Seiten (wie ein Foto/Scan) und lässt sich in PDF-Programmen daher nicht als Text bearbeiten.</div>
+
+      <button class="btn-secondary" style="margin-top:10px" onclick="printReport()" id="printPdfBtn">Als bearbeitbare PDF drucken …</button>
+      <div class="hint">Öffnet den Druckdialog des Browsers; dort als Ziel „Als PDF speichern" wählen. Anders als beim PDF-Export oben enthält das Ergebnis echten, auswählbaren Text und lässt sich z. B. in PDF-XChange Editor bearbeiten. Tipp: Unter „Weitere Einstellungen" im Druckdialog die Kopf-/Fußzeilen des Browsers abschalten, sonst erscheinen dort zusätzlich Datum/Dateipfad.</div>
 
       <button class="btn-secondary" style="margin-top:10px" onclick="exportForWordReport()" id="genJsonBtn">Berichtsdaten herunterladen (.json)</button>
       <div class="hint">Zum Fortführen dieser Baustelle beim nächsten Termin oder im nächsten Bericht wieder hochladen (Tab „Erfassen" → „Vorherige Sitzung laden") — dient außerdem als Sicherung und lässt sich alternativ im Chat mit Claude zu einem Word-Bericht verarbeiten.</div>
@@ -624,7 +643,7 @@ async function idbClearEntries(){
 // --- Berichtskopf (Deckblatt-Felder + Rahmentermine) genauso zwischenspeichern
 // wie die Feststellungen, damit ein Neuladen/Schließen des Tablets auch diese
 // Angaben nicht verwirft.
-const BERICHTSKOPF_FIELD_IDS = ['rProjekt','rBaustelle','rKunde','rVerfasser','rDatum','rBerichtsNr','rTempMin','rTempMax','rVerteiler','rRahmen','rRahmenHinweis'];
+const BERICHTSKOPF_FIELD_IDS = ['rProjekt','rBaustelle','rKunde','rKundeStrasse','rKundePlz','rGU','rGUStrasse','rGUPlz','rVerfasser','rDatum','rBerichtsNr','rTempMin','rTempMax','rVerteiler','rRahmen','rRahmenHinweis'];
 
 async function idbPutMeta(key, value){
   try{
@@ -906,6 +925,11 @@ function buildBerichtskopfPayload(){
     projekt: document.getElementById('rProjekt').value,
     baustelle: document.getElementById('rBaustelle').value,
     kunde: document.getElementById('rKunde').value,
+    kundeStrasse: document.getElementById('rKundeStrasse').value,
+    kundePlz: document.getElementById('rKundePlz').value,
+    generalunternehmer: document.getElementById('rGU').value,
+    generalunternehmerStrasse: document.getElementById('rGUStrasse').value,
+    generalunternehmerPlz: document.getElementById('rGUPlz').value,
     verfasser: document.getElementById('rVerfasser').value,
     datum: document.getElementById('rDatum').value,
     berichtsNr: document.getElementById('rBerichtsNr').value,
@@ -1146,6 +1170,11 @@ async function importContinueFile(e){
       setIfEmpty('rProjekt', bk.projekt);
       setIfEmpty('rBaustelle', bk.baustelle);
       setIfEmpty('rKunde', bk.kunde);
+      setIfEmpty('rKundeStrasse', bk.kundeStrasse);
+      setIfEmpty('rKundePlz', bk.kundePlz);
+      setIfEmpty('rGU', bk.generalunternehmer);
+      setIfEmpty('rGUStrasse', bk.generalunternehmerStrasse);
+      setIfEmpty('rGUPlz', bk.generalunternehmerPlz);
       setIfEmpty('rVerfasser', bk.verfasser);
       setIfEmpty('rBerichtsNr', bk.berichtsNr);
       setIfEmpty('rVerteiler', bk.verteiler);
@@ -1491,6 +1520,7 @@ async function saveEntryEdit(id){
   if(!e) return;
   const fields = {
     gewerk: document.getElementById('ed_gewerk_'+id).value.trim(),
+    ort: document.getElementById('ed_ort_'+id).value.trim(),
     bauteil: document.getElementById('ed_bauteil_'+id).value.trim(),
     arbeiten: document.getElementById('ed_arbeiten_'+id).value.trim(),
     datum: document.getElementById('ed_datum_'+id).value.trim(),
@@ -1636,12 +1666,25 @@ function renderVerteilerEditor(){
           <td><input type="text" value="${escapeHtml(name)}" onchange="updateVerteilerCell(${i},0,this.value)" placeholder="Name"></td>
           <td><input type="text" value="${escapeHtml(firma)}" onchange="updateVerteilerCell(${i},1,this.value)" placeholder="Firma"></td>
           <td><input type="text" value="${escapeHtml(kuerzel)}" onchange="updateVerteilerCell(${i},2,this.value)" placeholder="Kürzel"></td>
-          <td><input type="text" value="${escapeHtml(email)}" onchange="updateVerteilerCell(${i},3,this.value)" placeholder="E-Mail"></td>
+          <td><input type="text" value="${escapeHtml(email)}" onchange="updateVerteilerCell(${i},3,this.value)" onkeydown="handleAddrTabKey(event)" placeholder="E-Mail" title="Tab-Taste fügt bei Bedarf eine Umbruchstelle für lange Adressen ein"></td>
           <td><button type="button" class="del-btn" onclick="removeVerteilerRow(${i})" title="Zeile löschen">✕</button></td>
         </tr>`;
       }).join('')}
     </table>
   ` : '<div class="empty">Noch keine Empfänger — mit „+ Empfänger hinzufügen" beginnen.</div>';
+}
+// Fuegt bei langen E-Mail-Adressen auf Wunsch eine gezielte Umbruchstelle
+// ein: die Tab-Taste navigiert hier NICHT zum naechsten Feld, sondern fuegt
+// an der Cursorposition ein Tab-Zeichen ein, das beim Berichtsexport (Word
+// wie PDF) als Zeilenumbruch an genau dieser Stelle gerendert wird.
+function handleAddrTabKey(e){
+  if(e.key !== 'Tab') return;
+  e.preventDefault();
+  const el = e.target;
+  const start = el.selectionStart, end = el.selectionEnd;
+  el.value = el.value.slice(0, start) + '\t' + el.value.slice(end);
+  el.selectionStart = el.selectionEnd = start + 1;
+  el.dispatchEvent(new Event('change'));
 }
 function updateVerteilerCell(i, colIdx, val){
   const rows = getVerteilerRows();
@@ -1707,12 +1750,12 @@ function renderRahmenSetup(){
   const rows = getRahmenRows();
   container.innerHTML = rows.length ? `
     <table class="editable-table">
-      <tr><th>Bereich</th><th>Gewerk</th><th colspan="2">TP</th><th></th></tr>
+      <tr><th>Gewerk</th><th>Bereich</th><th colspan="2">TP</th><th></th></tr>
       ${rows.map((r,i) => {
         const [haus='',gewerk='',tpVon='',tpBis=''] = r;
         return `<tr>
-          <td><input type="text" value="${escapeHtml(haus)}" onchange="updateRahmenCell(${i},0,this.value)" placeholder="z. B. Haus 1, 2, 3"></td>
           <td><input type="text" value="${escapeHtml(gewerk)}" onchange="updateRahmenCell(${i},1,this.value)" placeholder="z. B. Rohbau EG"></td>
+          <td><input type="text" value="${escapeHtml(haus)}" onchange="updateRahmenCell(${i},0,this.value)" placeholder="z. B. Haus 1, 2, 3"></td>
           <td><input type="text" value="${escapeHtml(tpVon)}" onchange="updateRahmenCell(${i},2,this.value)" placeholder="TT.MM.JJJJ"></td>
           <td><input type="text" value="${escapeHtml(tpBis)}" onchange="updateRahmenCell(${i},3,this.value)" placeholder="TT.MM.JJJJ"></td>
           <td><button type="button" class="del-btn" onclick="removeRahmenRow(${i})" title="Zeile löschen">✕</button></td>
@@ -1728,12 +1771,12 @@ function renderRahmenStatus(){
   if(!rows.length){ container.innerHTML = '<div class="empty">Erst oben unter „Rahmentermine festlegen" Zeilen anlegen.</div>'; return; }
   container.innerHTML = `
     <table class="editable-table">
-      <tr><th>Bereich</th><th>Gewerk</th><th>TP</th><th>Bautenstand</th><th>%</th><th>Pünktlichkeit</th><th>Prognose zum TP</th></tr>
+      <tr><th>Gewerk</th><th>Bereich</th><th>TP</th><th>Bautenstand</th><th>%</th><th>Pünktlichkeit</th><th>Prognose zum TP</th></tr>
       ${rows.map((r,i) => {
         const [haus='',gewerk='',tpVon='',tpBis='',bautenstand='',prozent='',status='',prognose=''] = r;
         return `<tr>
-          <td class="ro-cell">${escapeHtml(haus) || '—'}</td>
           <td class="ro-cell">${escapeHtml(gewerk) || '—'}</td>
+          <td class="ro-cell">${escapeHtml(haus) || '—'}</td>
           <td class="ro-cell">${escapeHtml(tpVon) || '—'}${tpBis ? ' – ' + escapeHtml(tpBis) : ''}</td>
           <td><select onchange="updateRahmenCell(${i},4,this.value)">
             ${optionsWithFallback(BAUTENSTAND_OPTIONS, bautenstand).map(([val,label]) => `<option value="${val}" ${bautenstand===val?'selected':''}>${escapeHtml(label)}</option>`).join('')}
@@ -1831,8 +1874,9 @@ function renderEditor(){
       <div class="edit-thumb"><img src="${e.photoUrl}" onclick="openLightboxById('${e.id}')" title="Zum Vergrößern klicken"></div>
       <div class="edit-fields">
         <div class="edit-status">${e.bearbeitet ? '<span class="badge green">Gespeichert</span>' : '<span class="badge orange">Noch nicht bearbeitet</span>'}</div>
-        <div class="row2">
+        <div class="row2 row3">
           <div><label>Gewerk</label><input type="text" id="ed_gewerk_${e.id}" value="${escapeHtml(e.gewerk)}" placeholder="z. B. Rohbau"></div>
+          <div><label>Ort</label><input type="text" id="ed_ort_${e.id}" value="${escapeHtml(e.ort||'')}" placeholder="z. B. Haus 1"></div>
           <div><label>Bauteil</label><input type="text" id="ed_bauteil_${e.id}" value="${escapeHtml(e.bauteil||'')}" placeholder="z. B. Wände EG"></div>
         </div>
         <div class="field-block"><label>Info</label><textarea id="ed_arbeiten_${e.id}" placeholder="bei Bedarf inkl. Material">${escapeHtml(e.arbeiten||'')}</textarea></div>
@@ -2023,6 +2067,13 @@ function renderReport(){
   const projekt = document.getElementById('rProjekt').value || '—';
   const baustelle = document.getElementById('rBaustelle').value || '—';
   const kunde = document.getElementById('rKunde').value || '—';
+  const kundeStrasse = document.getElementById('rKundeStrasse').value.trim();
+  const kundePlz = document.getElementById('rKundePlz').value.trim();
+  const kundeLines = [kunde, kundeStrasse, kundePlz].filter(Boolean);
+  const gu = document.getElementById('rGU').value.trim();
+  const guStrasse = document.getElementById('rGUStrasse').value.trim();
+  const guPlz = document.getElementById('rGUPlz').value.trim();
+  const guLines = [gu, guStrasse, guPlz].filter(Boolean);
   const verfasser = document.getElementById('rVerfasser').value || '—';
   const datum = document.getElementById('rDatum').value || '—';
   const tempMin = fmtTemp(document.getElementById('rTempMin').value);
@@ -2059,13 +2110,13 @@ function renderReport(){
     rahmenBody += `<h3 class="section">Rahmentermine</h3>
       ${rahmenHinweis ? `<div class="section-note">${escapeHtml(rahmenHinweis)}</div>` : ''}
       <table class="rahmen-table">
-        <colgroup><col class="c-haus"><col class="c-gewerk"><col class="c-tpvon"><col class="c-tpbis"><col class="c-stand"><col class="c-proz"><col class="c-ampel"><col class="c-prognose"></colgroup>
-        <tr><th>Bereich</th><th>Gewerk</th><th colspan="2">${escapeHtml(tpHeader)}</th><th colspan="3">Bautenstand</th><th>Prognose</th></tr>
+        <colgroup><col class="c-gewerk"><col class="c-haus"><col class="c-tpvon"><col class="c-tpbis"><col class="c-stand"><col class="c-proz"><col class="c-ampel"><col class="c-prognose"></colgroup>
+        <tr><th>Gewerk</th><th>Bereich</th><th colspan="2">${escapeHtml(tpHeader)}</th><th colspan="3">Bautenstand</th><th>Prognose</th></tr>
         ${rahmenRows.length > 0 ? rahmenRows.map(r => {
           const [haus='', gewerk='', tpVon='', tpBis='', bautenstand='', prozent='', status='', prognose=''] = r;
           const swatchColor = RAHMEN_SWATCH_COLOR[status] || '';
           const muted = !status ? ' muted' : '';
-          return `<tr><td class="haus">${escapeHtml(haus)}</td><td>${escapeHtml(gewerk)}</td><td>${escapeHtml(tpVon)}</td><td>${escapeHtml(tpBis)}</td><td class="${muted.trim()}">${escapeHtml(bautenstandLabel(bautenstand))}</td><td class="num${muted}">${prozent !== '' ? escapeHtml(prozent) : ''}</td><td class="status-cell">${swatchColor ? `<i class="status-swatch" style="background:${swatchColor}"></i>` : ''}</td><td>${escapeHtml(prognose)}</td></tr>`;
+          return `<tr><td>${escapeHtml(gewerk)}</td><td class="haus">${escapeHtml(haus)}</td><td>${escapeHtml(tpVon)}</td><td>${escapeHtml(tpBis)}</td><td class="${muted.trim()}">${escapeHtml(bautenstandLabel(bautenstand))}</td><td class="num${muted}">${prozent !== '' ? escapeHtml(prozent) : ''}</td><td class="status-cell">${swatchColor ? `<i class="status-swatch" style="background:${swatchColor}"></i>` : ''}</td><td>${escapeHtml(prognose)}</td></tr>`;
         }).join('') : Array.from({length:12}).map(() => `<tr class="blank-row"><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`).join('')}
       </table>
       <div class="ampel-legende">
@@ -2150,14 +2201,14 @@ function renderReport(){
       <tr class="gap"><td class="k">Verfasser</td><td>${escapeHtml(verfasser)}</td></tr>
       <tr><td class="k">Datum</td><td>${escapeHtml(datum)}</td></tr>
       <tr><td class="k">Seitenanzahl</td><td>${totalPages} Seiten</td></tr>
-      <tr class="gap"><td class="k">Kunde</td><td>${escapeHtml(kunde)}</td></tr>
+      <tr class="gap"><td class="k">Kunde</td><td>${kundeLines.map(escapeHtml).join('<br>')}</td></tr>
+      ${guLines.length ? `<tr><td class="k">Generalunternehmer</td><td>${guLines.map(escapeHtml).join('<br>')}</td></tr>` : ''}
     </table>
     ${kurz ? '' : `<div class="rp-subhead">Verteiler</div>
     <table class="verteiler-table">
       <colgroup><col class="c1"><col><col class="c3"><col class="c4"></colgroup>
       <tr><th>Name</th><th>Firma</th><th>Kürzel</th><th>E-Mail</th></tr>
-      ${verteilerRows.map(r => { const [name='',firma='',kuerzel='',email=''] = r; return `<tr><td>${escapeHtml(name)}</td><td>${escapeHtml(firma)}</td><td>${escapeHtml(kuerzel)}</td><td>${escapeHtml(email)}</td></tr>`; }).join('')}
-      ${Array.from({length: Math.max(0, 12 - verteilerRows.length)}).map(() => `<tr class="blank-row"><td>&nbsp;</td><td></td><td></td><td></td></tr>`).join('')}
+      ${verteilerRows.map(r => { const [name='',firma='',kuerzel='',email=''] = r; return `<tr><td>${escapeHtml(name)}</td><td>${escapeHtml(firma)}</td><td>${escapeHtml(kuerzel)}</td><td>${escapeHtml(email).replace(/\t/g,'<br>')}</td></tr>`; }).join('')}
     </table>
     <table class="meta-table" style="margin-top:11.3px">
       <tr><td class="k">Verteilung</td><td>per Email</td></tr>
@@ -2190,6 +2241,19 @@ function renderReport(){
   });
 
   document.getElementById('reportOutput').innerHTML = html;
+}
+
+// Alternative zu exportPdf(): nutzt den nativen Druckdialog des Browsers
+// (window.print()) statt html2canvas-Rasterung. Das Ergebnis ("Als PDF
+// speichern" im Druckdialog) enthält echten, auswählbaren/bearbeitbaren
+// Text statt eines Seitenfotos - auf Kosten eines manuellen Dialogschritts
+// und ggf. sichtbarer Browser-Kopf-/Fußzeilen (siehe Hinweistext im UI).
+function printReport(){
+  if(allEntries.length === 0){ alert('Noch keine Feststellungen erfasst.'); return; }
+  switchTab('report');
+  // Einen Frame abwarten, damit der (frisch aufgebaute) Bericht sicher im
+  // DOM steht, bevor der Druckdialog den aktuellen Zustand erfasst.
+  requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
 }
 
 // Erstellt eine echte PDF-Datei direkt im Browser (kein window.print()) -
