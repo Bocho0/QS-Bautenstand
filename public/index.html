@@ -9,6 +9,11 @@
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- Wandelt iPhone-Fotos im HEIC/HEIF-Format (Standardformat der "Hohe
+     Effizienz"-Kameraeinstellung) im Browser in JPEG um, bevor sie
+     verarbeitet werden - normale Browser (auch Chrome unter Windows) können
+     HEIC sonst nicht als Bild laden/dekodieren. -->
+<script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 <style>
   :root{
     --charcoal:#1C1F22;
@@ -1393,11 +1398,41 @@ async function processPhotoFiles(files){
   }
 }
 
+// Erkennt HEIC/HEIF-Dateien (Standardformat der iPhone-Kamera bei "Hohe
+// Effizienz") - normale Browser (auch Chrome unter Windows) können diese
+// nicht als Bild laden/dekodieren, was ohne diese Umwandlung zu "Foto
+// konnte nicht verarbeitet werden" führt.
+function isHeicFile(file){
+  const type = (file.type || '').toLowerCase();
+  const name = (file.name || '').toLowerCase();
+  return type === 'image/heic' || type === 'image/heif' || /\.hei[cf]$/.test(name);
+}
+
+// Wandelt eine HEIC/HEIF-Datei im Browser nach JPEG um (siehe heic2any-
+// Script-Einbindung im <head>), bevor sie wie jedes andere Foto verarbeitet
+// wird. Alle anderen Formate werden unverändert durchgereicht.
+async function maybeConvertHeic(file){
+  if(!isHeicFile(file)) return file;
+  if(typeof heic2any === 'undefined'){
+    throw new Error('HEIC-Fotos können hier nicht umgewandelt werden (keine Internetverbindung?). Bitte in den iPhone-Kameraeinstellungen unter Einstellungen > Kamera > Formate auf "Am kompatibelsten" umstellen, oder das Foto vorher manuell in JPG umwandeln.');
+  }
+  try{
+    const result = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 });
+    // Mehrbild-HEIC (z.B. Live Photos) liefert ein Array zurück - dann nur
+    // das erste (eigentliche) Bild verwenden.
+    const blob = Array.isArray(result) ? result[0] : result;
+    return new File([blob], (file.name || 'foto').replace(/\.hei[cf]$/i, '.jpg'), { type: 'image/jpeg' });
+  }catch(err){
+    console.error('HEIC-Konvertierung fehlgeschlagen', err);
+    throw new Error('HEIC-Foto konnte nicht umgewandelt werden. Bitte in den iPhone-Kameraeinstellungen unter Einstellungen > Kamera > Formate auf "Am kompatibelsten" umstellen, oder das Foto vorher manuell in JPG umwandeln.');
+  }
+}
+
 // Verarbeitet genau EIN Foto: Ausrichtung korrigieren, Vorschau-/Druck-/
 // Vollversion erzeugen, als neue Feststellung speichern. Gibt ein Promise
 // zurueck, das erst nach vollstaendigem Speichern (inkl. Galerie) aufgeloest wird.
 function processSinglePhoto(file, sortOrder){
-  return loadOrientedImage(file).then(function(result){
+  return maybeConvertHeic(file).then(loadOrientedImage).then(function(result){
     const oriented = result.canvas;
     const fullW = oriented.width, fullH = oriented.height;
 
