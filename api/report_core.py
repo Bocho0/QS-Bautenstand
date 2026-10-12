@@ -79,7 +79,11 @@ def crop_to_box(photo_path, max_h_in=MAX_BOX_IN, max_w_in=MAX_BOX_WIDTH_IN):
             cropped = im.crop((0, y0, w_px, y0 + new_h))
         else:
             cropped = im
-        cropped.save(photo_path, 'JPEG', quality=92)
+        # Hoechste Qualitaet beim erneuten Speichern (Zuschneiden erfordert
+        # ein Re-Encode) - quality=97 und ohne Chroma-Subsampling, damit der
+        # zusaetzliche Kompressionsschritt keinen sichtbaren Qualitaetsverlust
+        # gegenueber dem Originalfoto verursacht.
+        cropped.save(photo_path, 'JPEG', quality=97, subsampling=0, optimize=True)
     return Emu(int(max_w_in * EMU_PER_IN)), Emu(int(max_h_in * EMU_PER_IN))
 
 
