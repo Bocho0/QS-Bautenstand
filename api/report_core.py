@@ -643,7 +643,7 @@ def build(template_path, data, out_path, tmp_dir='/tmp/report_photos', only_cont
         def vcell(text, width, header=False, muted=False):
             if header:
                 rpr = f'<w:rFonts w:ascii="Barlow" w:hAnsi="Barlow"/><w:sz w:val="15"/><w:szCs w:val="15"/><w:spacing w:val="4"/><w:color w:val="{COL_TABLE_HEAD}"/>'
-                border = f'<w:tcBorders><w:top w:val="none"/><w:left w:val="none"/><w:right w:val="none"/><w:bottom w:val="single" w:sz="6" w:space="0" w:color="{COL_TABLE_HEAD}"/></w:tcBorders>'
+                border = f'<w:tcBorders><w:top w:val="none"/><w:left w:val="none"/><w:right w:val="none"/><w:bottom w:val="single" w:sz="6" w:space="0" w:color="{COL_LABEL_DOC}"/></w:tcBorders>'
             else:
                 color = COL_MUTED_ID if muted else COL_TEXT
                 rpr = f'<w:rFonts w:ascii="Barlow" w:hAnsi="Barlow"/><w:sz w:val="18"/><w:szCs w:val="18"/><w:color w:val="{color}"/>'
