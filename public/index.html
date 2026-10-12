@@ -424,15 +424,16 @@
         <div class="full"><label>Projekt / Baustelle</label><input type="text" id="rProjekt" placeholder="z. B. XY | München"></div>
         <div><label>Baustellenbezeichnung</label><input type="text" id="rBaustelle" placeholder="z. B. Baustelle XY"></div>
         <div><label>Kunde</label><input type="text" id="rKunde" placeholder="Kundenname"></div>
+        <div><label>Kunde – Straße Hausnr.</label><input type="text" id="rKundeStrasse" placeholder="z. B. Heroldsberger Weg 8"></div>
+        <div><label>Kunde – PLZ Ort</label><input type="text" id="rKundePlz" placeholder="z. B. 90411 Nürnberg"></div>
         <div><label>Verfasser (Kürzel)</label><input type="text" id="rVerfasser" placeholder="z. B. NFM"></div>
         <div><label>Datum Bericht</label><input type="text" id="rDatum" placeholder="TT.MM.JJJJ"></div>
-        <div>
+        <div id="berichtsNrField">
           <label>Berichts-Nr. <button type="button" class="wetter-btn" onclick="startNewReportInReihe()" title="Aktuelle Feststellungen als Kurzdarstellung ablegen und Berichts-Nr. erhöhen">➜ neuer Bericht</button></label>
           <input type="number" id="rBerichtsNr" placeholder="z. B. 1" min="1">
         </div>
         <div><label>Temperatur Min.</label><input type="text" id="rTempMin" placeholder="z. B. 16,0°C"></div>
         <div><label>Temperatur Max.</label><input type="text" id="rTempMax" placeholder="z. B. 22,0°C"></div>
-        <div id="kurzThemaDatumField" style="display:none"><label>Datum der Begehung <span style="font-weight:400;color:var(--muted)">(für „Thema" auf dem Deckblatt und die Dokumentbenennung)</span></label><input type="text" id="rKurzThemaDatum" placeholder="TT.MM.JJJJ"></div>
         <input type="text" id="rDateiname" style="display:none" aria-hidden="true">
       </div>
 
@@ -552,8 +553,12 @@ function setBerichtsModus(modus){
   if(rahmenVerteilerBlock) rahmenVerteilerBlock.style.display = berichtsModus === 'kurz' ? 'none' : '';
   const teilnehmerBlock = document.getElementById('teilnehmerBlock');
   if(teilnehmerBlock) teilnehmerBlock.style.display = berichtsModus === 'kurz' ? '' : 'none';
-  const kurzThemaDatumField = document.getElementById('kurzThemaDatumField');
-  if(kurzThemaDatumField) kurzThemaDatumField.style.display = berichtsModus === 'kurz' ? '' : 'none';
+  // Kurzbericht ist kein durchnummerierter Bericht in einer Reihe, sondern
+  // ein eigenstaendiger Bericht je Begehung - Dokumentbenennung laeuft
+  // stattdessen ueber das Datum (siehe autoDateinameFromInputs). Daher keine
+  // Berichts-Nr.-Eingabe in diesem Modus.
+  const berichtsNrField = document.getElementById('berichtsNrField');
+  if(berichtsNrField) berichtsNrField.style.display = berichtsModus === 'kurz' ? 'none' : '';
   idbPutMeta('berichtsModus', berichtsModus).catch(()=>{});
   refreshReportViews();
 }
@@ -637,7 +642,7 @@ async function idbClearEntries(){
 // --- Berichtskopf (Deckblatt-Felder + Rahmentermine) genauso zwischenspeichern
 // wie die Feststellungen, damit ein Neuladen/Schließen des Tablets auch diese
 // Angaben nicht verwirft.
-const BERICHTSKOPF_FIELD_IDS = ['rProjekt','rBaustelle','rKunde','rVerfasser','rDatum','rBerichtsNr','rTempMin','rTempMax','rVerteiler','rRahmen','rRahmenHinweis','rTeilnehmer','rKurzThemaDatum'];
+const BERICHTSKOPF_FIELD_IDS = ['rProjekt','rBaustelle','rKunde','rKundeStrasse','rKundePlz','rVerfasser','rDatum','rBerichtsNr','rTempMin','rTempMax','rVerteiler','rRahmen','rRahmenHinweis','rTeilnehmer'];
 
 async function idbPutMeta(key, value){
   try{
@@ -791,11 +796,10 @@ function autoDateinameFromInputs(){
   if(!kuerzel) return '';
   const kuerzelClean = kuerzel.replace(/[^A-Za-z0-9äöüÄÖÜß-]+/g,'');
   if(berichtsModus === 'kurz'){
-    // Kurzbericht: Berichtsnummer entfaellt, stattdessen das Datum der
-    // Begehung aus dem eigenen Eingabefeld - "JJMMTT_Kurzbericht-
-    // Baustellenbegehung-Kürzel", z. B. "260910_Kurzbericht-Baustellenbegehung-CHA.docx".
-    const kurzEl = document.getElementById('rKurzThemaDatum');
-    const iso = parseGermanDateToISO(kurzEl ? kurzEl.value : '');
+    // Kurzbericht: Berichtsnummer entfaellt, stattdessen dasselbe Datum wie
+    // "Datum Bericht" oben - "JJMMTT_Kurzbericht-Baustellenbegehung-Kürzel",
+    // z. B. "260910_Kurzbericht-Baustellenbegehung-CHA.docx".
+    const iso = parseGermanDateToISO(document.getElementById('rDatum').value);
     if(!iso) return '';
     const jj = iso.slice(2,4), mm = iso.slice(5,7), tt = iso.slice(8,10);
     return `${jj}${mm}${tt}_Kurzbericht-Baustellenbegehung-${kuerzelClean}.docx`;
@@ -930,6 +934,8 @@ function buildBerichtskopfPayload(){
     projekt: document.getElementById('rProjekt').value,
     baustelle: document.getElementById('rBaustelle').value,
     kunde: document.getElementById('rKunde').value,
+    kundeStrasse: document.getElementById('rKundeStrasse').value,
+    kundePlz: document.getElementById('rKundePlz').value,
     verfasser: document.getElementById('rVerfasser').value,
     datum: document.getElementById('rDatum').value,
     berichtsNr: document.getElementById('rBerichtsNr').value,
@@ -939,7 +945,6 @@ function buildBerichtskopfPayload(){
     rahmentermine: document.getElementById('rRahmen').value,
     rahmenHinweis: document.getElementById('rRahmenHinweis').value,
     teilnehmer: document.getElementById('rTeilnehmer').value,
-    kurzThemaDatum: document.getElementById('rKurzThemaDatum').value,
     // Immer frisch berechnet (JJMMTT_QS-Bericht-Nr-Kürzel) statt aus einem
     // Eingabefeld gelesen - so stimmt er garantiert auch dann, wenn Datum/
     // Nr./Projekt sich seit dem letzten Mal geändert haben.
@@ -1172,13 +1177,14 @@ async function importContinueFile(e){
       setIfEmpty('rProjekt', bk.projekt);
       setIfEmpty('rBaustelle', bk.baustelle);
       setIfEmpty('rKunde', bk.kunde);
+      setIfEmpty('rKundeStrasse', bk.kundeStrasse);
+      setIfEmpty('rKundePlz', bk.kundePlz);
       setIfEmpty('rVerfasser', bk.verfasser);
       setIfEmpty('rBerichtsNr', bk.berichtsNr);
       setIfEmpty('rVerteiler', bk.verteiler);
       setIfEmpty('rRahmen', bk.rahmentermine);
       setIfEmpty('rRahmenHinweis', bk.rahmenHinweis);
       setIfEmpty('rTeilnehmer', bk.teilnehmer);
-      setIfEmpty('rKurzThemaDatum', bk.kurzThemaDatum);
       updateHeaderProj();
       scheduleBerichtskopfSave();
     }
@@ -2051,6 +2057,10 @@ function renderReport(){
   const projekt = document.getElementById('rProjekt').value || '—';
   const baustelle = document.getElementById('rBaustelle').value || '—';
   const kunde = document.getElementById('rKunde').value || '—';
+  const kundeStrasse = document.getElementById('rKundeStrasse').value.trim();
+  const kundePlz = document.getElementById('rKundePlz').value.trim();
+  const kundeLines = [document.getElementById('rKunde').value.trim(), kundeStrasse, kundePlz].filter(Boolean);
+  const kundeHtml = (kundeLines.length ? kundeLines : ['—']).map(escapeHtml).join('<br>');
   const verfasser = document.getElementById('rVerfasser').value || '—';
   const datum = document.getElementById('rDatum').value || '—';
   const tempMin = fmtTemp(document.getElementById('rTempMin').value);
@@ -2059,10 +2069,10 @@ function renderReport(){
   const berichtsNrPadded = berichtsNr.padStart(3,'0');
   const isoToday = new Date().toISOString().slice(2,10).replace(/-/g,'');
   // Kurzbericht: Dokumentbenennung ohne Berichtsnummer, stattdessen das Datum
-  // der Begehung (eigenes Eingabefeld) - Format wie im Beispiel:
-  // "JJMMTT_Kurzbericht-Baustellenbegehung-Kürzel".
-  const kurzThemaDatumIso = kurz ? parseGermanDateToISO(document.getElementById('rKurzThemaDatum').value) : null;
-  const kurzDateJJMMTT = kurzThemaDatumIso ? kurzThemaDatumIso.slice(2,4) + kurzThemaDatumIso.slice(5,7) + kurzThemaDatumIso.slice(8,10) : isoToday;
+  // des Berichts (gleiches Feld wie "Datum Bericht" oben) - Format wie im
+  // Beispiel: "JJMMTT_Kurzbericht-Baustellenbegehung-Kürzel".
+  const berichtDatumIso = kurz ? parseGermanDateToISO(document.getElementById('rDatum').value) : null;
+  const kurzDateJJMMTT = berichtDatumIso ? berichtDatumIso.slice(2,4) + berichtDatumIso.slice(5,7) + berichtDatumIso.slice(8,10) : isoToday;
   const kuerzelClean = (guessKuerzel() || escapeHtml(verfasser)).replace(/[^A-Za-z0-9äöüÄÖÜß-]+/g,'');
   const autoDateiname = kurz
     ? `${kurzDateJJMMTT}_Kurzbericht-Baustellenbegehung-${kuerzelClean}.docx`
@@ -2179,8 +2189,9 @@ function renderReport(){
 
   const totalPages = pageCounter - 1;
 
-  const kurzThemaDatum = kurz ? (document.getElementById('rKurzThemaDatum').value || '').trim() : '';
-  const kurzThema = `Kurzbericht zur Baustellenbegehung${kurzThemaDatum ? ' vom ' + escapeHtml(kurzThemaDatum) : ''}`;
+  // Thema (Kurzbericht): nutzt dasselbe Datum wie "Datum Bericht" oben -
+  // es gibt kein separates Begehungsdatum mehr.
+  const kurzThema = `Kurzbericht zur Baustellenbegehung${datum && datum !== '—' ? ' vom ' + escapeHtml(datum) : ''}`;
   const teilnehmerLines = kurz ? (document.getElementById('rTeilnehmer').value || '').split('\n').map(s=>s.trim()).filter(Boolean) : [];
 
   const coverBody = `
@@ -2190,7 +2201,7 @@ function renderReport(){
       <tr class="gap"><td class="k">Verfasser</td><td>${escapeHtml(verfasser)}</td></tr>
       <tr><td class="k">Datum</td><td>${escapeHtml(datum)}</td></tr>
       <tr><td class="k">Seitenanzahl</td><td>${totalPages} Seiten</td></tr>
-      <tr class="gap"><td class="k">Kunde</td><td>${escapeHtml(kunde)}</td></tr>
+      <tr class="gap"><td class="k">Kunde</td><td>${kundeHtml}</td></tr>
       ${kurz && teilnehmerLines.length ? `<tr class="gap"><td class="k">Teilnehmer</td><td>${teilnehmerLines.map(escapeHtml).join('<br>')}</td></tr>` : ''}
     </table>
     ${kurz ? '' : `<div class="rp-subhead">Verteiler</div>
