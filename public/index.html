@@ -205,6 +205,7 @@
     font-size:10px; letter-spacing:0.12em; text-transform:uppercase;
     color:#6A6A6A; margin:41.6px 0 7.6px;
   }
+  .rp-subhead.toc-subhead{ color:#1C1C1C; }   /* Inhaltsverzeichnis-Ueberschrift: schwarz statt grau */
 
   /* ---- Tabellen: NUR waagerechte Linien ---- */
   table.verteiler-table, table.rahmen-table, table.doku-index, table.doku-entries{
@@ -320,11 +321,14 @@
   .entry-grid .lbl{ color:#8A8A8A; overflow-wrap:break-word; word-break:break-word; hyphens:auto; }
   .entry-stand{ position:absolute; left:0; bottom:11.3px; color:#8A8A8A; }
   table.doku-entries td.entry-photo{ padding:11.3px 0 11.3px 0; text-align:left; }
-  table.doku-entries td.entry-photo img{
+  /* Als Hintergrundbild statt <img object-fit:cover> gerendert: html2canvas
+     (PDF-Export) setzt object-fit auf <img> unzuverlaessig um und zeigt das
+     Foto dann gestaucht statt zugeschnitten - background-size:cover wird von
+     html2canvas dagegen korrekt wiedergegeben. */
+  table.doku-entries td.entry-photo .entry-photo-box{
     display:block; width:317.5px; height:238.1px;   /* 84 x 63 mm, fest */
-    object-fit:cover; background:#F5F5F3;
+    background-color:#F5F5F3; background-size:cover; background-position:center center; background-repeat:no-repeat;
     border:0.5px solid #DCDCD8; border-radius:0;
-    aspect-ratio:auto;
   }
 
   /* ---- Export-Klon ---- */
@@ -2030,10 +2034,11 @@ function entryTextBlock(e, showVerantwortlich){
 }
 
 function entryRow(nrLabel, e, showVerantwortlich){
+  const photoUrl = e.photoPrintUrl || e.photoUrl || '';
   return `<tr>
     <td class="entry-nr">${escapeHtml(String(nrLabel))}</td>
     <td class="entry-text">${entryTextBlock(e, showVerantwortlich)}</td>
-    <td class="entry-photo"><img src="${e.photoPrintUrl || e.photoUrl}"></td>
+    <td class="entry-photo"><div class="entry-photo-box" style="background-image:url('${photoUrl}')"></div></td>
   </tr>`;
 }
 
@@ -2212,7 +2217,7 @@ function renderReport(){
       <tr><td class="k">Anlagen</td><td>./.</td></tr>
     </table>`}
     <div class="toc-block">
-      <div class="rp-subhead">Inhaltsverzeichnis</div>
+      <div class="rp-subhead toc-subhead">Inhaltsverzeichnis</div>
       ${toc.map(t => `<div class="toc-line"><span>${escapeHtml(t.title)}</span><span class="dots"></span><span class="pg">${t.page}</span></div>`).join('')}
     </div>
   `;
