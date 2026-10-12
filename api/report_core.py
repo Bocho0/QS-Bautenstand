@@ -399,7 +399,8 @@ def build_text_cell(cell, entry, base_run_unused, image_height_pt):
         line_count += 1 + estimate_wrapped_extra_lines(value)
 
     add_field('Gewerk', entry.get('gewerk', ''))
-    add_field('Ort', entry.get('ort', ''))
+    if entry.get('ort'):
+        add_field('Ort', entry['ort'])
     if entry.get('bauteil'):
         add_field('Bauteil', entry['bauteil'])
 
@@ -642,7 +643,7 @@ def build(template_path, data, out_path, tmp_dir='/tmp/report_photos', only_cont
         def vcell(text, width, header=False, muted=False):
             if header:
                 rpr = f'<w:rFonts w:ascii="Barlow" w:hAnsi="Barlow"/><w:sz w:val="15"/><w:szCs w:val="15"/><w:spacing w:val="4"/><w:color w:val="{COL_TABLE_HEAD}"/>'
-                border = f'<w:tcBorders><w:top w:val="none"/><w:left w:val="none"/><w:right w:val="none"/><w:bottom w:val="single" w:sz="6" w:space="0" w:color="{COL_LINE_DARK}"/></w:tcBorders>'
+                border = f'<w:tcBorders><w:top w:val="none"/><w:left w:val="none"/><w:right w:val="none"/><w:bottom w:val="single" w:sz="6" w:space="0" w:color="{COL_TABLE_HEAD}"/></w:tcBorders>'
             else:
                 color = COL_MUTED_ID if muted else COL_TEXT
                 rpr = f'<w:rFonts w:ascii="Barlow" w:hAnsi="Barlow"/><w:sz w:val="18"/><w:szCs w:val="18"/><w:color w:val="{color}"/>'
