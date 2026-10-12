@@ -55,7 +55,7 @@
   .type-toggle button.on[data-type="veranlassung"]{ background:var(--rust); color:var(--white); border-color:var(--rust); }
   .type-toggle button.on[data-modus]{ background:var(--charcoal); color:var(--white); border-color:var(--charcoal); }
   label.photo-box{ border:2px dashed var(--line); border-radius:var(--radius); background:var(--concrete); text-align:center; padding:22px 12px; cursor:pointer; position:relative; overflow:hidden; display:block; }
-  .photo-box img{ display:block; width:100%; height:280px; object-fit:contain; background:var(--concrete-2); border-radius:2px; }
+  .photo-box img{ display:block; width:100%; height:280px; object-fit:cover; background:var(--concrete-2); border-radius:2px; }
   .photo-box .cta{ color:var(--muted); font-weight:600; font-size:14px; }
   .photo-box .cta .big{ display:block; font-family:'Archivo'; font-size:17px; color:var(--charcoal); margin-top:6px; }
   .photo-box svg{ width:34px; height:34px; color:var(--muted); }
@@ -67,7 +67,7 @@
   .row2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   .recent-item{ display:flex; gap:10px; padding:10px 0; border-bottom:1px solid var(--concrete-2); align-items:center; }
   .recent-item:last-child{ border-bottom:none; }
-  .recent-item img{ width:110px; height:110px; object-fit:contain; border-radius:3px; flex-shrink:0; background:var(--concrete-2); }
+  .recent-item img{ width:110px; height:110px; object-fit:cover; border-radius:3px; flex-shrink:0; background:var(--concrete-2); }
   .recent-item .meta{ flex:1; min-width:0; }
   .recent-item .meta .t1{ font-weight:700; font-size:13px; }
   .recent-item .meta .t2{ font-size:12px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -94,7 +94,7 @@
   .edit-group h3{ font-size:13px; text-transform:uppercase; letter-spacing:0.03em; margin:16px 0 8px; color:var(--muted); }
   .edit-group h3:first-child{ margin-top:0; }
   .edit-row{ display:flex; gap:10px; padding:12px 0; border-bottom:1px solid var(--concrete-2); }
-  .edit-thumb img{ width:130px; height:130px; object-fit:contain; background:var(--concrete-2); border-radius:3px; border:1px solid var(--line); cursor:zoom-in; }
+  .edit-thumb img{ width:130px; height:130px; object-fit:cover; background:var(--concrete-2); border-radius:3px; border:1px solid var(--line); cursor:zoom-in; }
   .edit-fields{ flex:1; display:flex; flex-direction:column; gap:10px; }
   .edit-fields input, .edit-fields textarea{ padding:7px 8px; font-size:13px; margin:0; }
   .edit-fields textarea{ min-height:44px; }
@@ -325,7 +325,7 @@
   table.doku-entries td.entry-photo{ padding:11.3px 0 11.3px 0; text-align:left; }
   table.doku-entries td.entry-photo img{
     display:block; width:317.5px; height:238.1px;   /* 84 x 63 mm, fest */
-    object-fit:contain; background:#F5F5F3;
+    object-fit:cover; background:#F5F5F3;
     border:0.5px solid #DCDCD8; border-radius:0;
     aspect-ratio:auto;
   }
