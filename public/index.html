@@ -225,7 +225,7 @@
     font-size:10px;                      /* 7,5pt */
     letter-spacing:0.06em; color:#6A6A6A;
     text-align:left; vertical-align:bottom;
-    border:none; border-bottom:1.1px solid #6A6A6A;
+    border:none; border-bottom:1.1px solid #8A8A8A;
     padding:0 8px 3.8px 0;
   }
   table.verteiler-table td, table.rahmen-table td,
@@ -2303,10 +2303,10 @@ function renderReport(){
       <tr><td class="k">Verteilung</td><td>per Email</td></tr>
       <tr><td class="k">Anlagen</td><td>./.</td></tr>
     </table>`}
-    <div class="toc-block">
+    ${kurz ? '' : `<div class="toc-block">
       <div class="rp-subhead toc-subhead">Inhaltsverzeichnis</div>
       ${toc.map(t => `<div class="toc-line"><span>${escapeHtml(t.title)}</span><span class="dots"></span><span class="pg">${t.page}</span></div>`).join('')}
-    </div>
+    </div>`}
   `;
 
   let html = `<div class="report-page">
