@@ -57,21 +57,30 @@ def decode_photo(data_url, out_path):
     return out_path
 
 
-def fit_box(w_px, h_px, max_h_in=MAX_BOX_IN, max_w_in=MAX_BOX_WIDTH_IN):
-    # Reines "contain"-Verhalten: das Foto wird unverzerrt (eigenes
-    # Seitenverhaeltnis bleibt erhalten, kein Zuschneiden) so groß wie
-    # moeglich in die vorgesehene Fotobox eingepasst - ob Hochformat,
-    # Querformat oder ein extremes Panorama. Frueher wurde das Verhaeltnis
-    # auf 0,65-1,7 geklemmt, bevor add_picture() Breite UND Hoehe explizit
-    # gesetzt hat - das hat Fotos außerhalb dieses Bereichs gestaucht/
-    # gestreckt statt sie nur zu verkleinern.
-    ratio = w_px / h_px
-    h_in = max_h_in
-    w_in = max_h_in * ratio
-    if w_in > max_w_in:
-        w_in = max_w_in
-        h_in = max_w_in / ratio
-    return Emu(int(w_in * EMU_PER_IN)), Emu(int(h_in * EMU_PER_IN))
+def crop_to_box(photo_path, max_h_in=MAX_BOX_IN, max_w_in=MAX_BOX_WIDTH_IN):
+    # "Cover"-Verhalten (wie object-fit:cover in der HTML-/PDF-Vorschau):
+    # das Foto behaelt sein eigenes Seitenverhaeltnis (keine Stauchung/
+    # Streckung), fuellt die Fotobox aber vollstaendig aus - ueberstehende
+    # Raender (links/rechts bei hochformatigen, oben/unten bei sehr breiten
+    # Fotos) werden mittig abgeschnitten, statt die Box mit leerem Rand
+    # (Letterboxing) nur auszufuellen.
+    target_ratio = max_w_in / max_h_in
+    with Image.open(photo_path) as im:
+        im = im.convert('RGB')
+        w_px, h_px = im.size
+        src_ratio = w_px / h_px
+        if src_ratio > target_ratio:
+            new_w = max(1, round(h_px * target_ratio))
+            x0 = (w_px - new_w) // 2
+            cropped = im.crop((x0, 0, x0 + new_w, h_px))
+        elif src_ratio < target_ratio:
+            new_h = max(1, round(w_px / target_ratio))
+            y0 = (h_px - new_h) // 2
+            cropped = im.crop((0, y0, w_px, y0 + new_h))
+        else:
+            cropped = im
+        cropped.save(photo_path, 'JPEG', quality=92)
+    return Emu(int(max_w_in * EMU_PER_IN)), Emu(int(max_h_in * EMU_PER_IN))
 
 
 def format_datum(raw):
@@ -443,9 +452,7 @@ def build_image_cell(cell, photo_path):
     p.paragraph_format.space_before = Pt(16)
     p.paragraph_format.space_after = Pt(16)
     r = p.add_run()
-    with Image.open(photo_path) as im:
-        w_px, h_px = im.size
-    w_emu, h_emu = fit_box(w_px, h_px)
+    w_emu, h_emu = crop_to_box(photo_path)
     r.add_picture(photo_path, width=w_emu, height=h_emu)
     return h_emu / EMU_PER_IN * 72
 
