@@ -58,8 +58,14 @@ def decode_photo(data_url, out_path):
 
 
 def fit_box(w_px, h_px, max_h_in=MAX_BOX_IN, max_w_in=MAX_BOX_WIDTH_IN):
+    # Reines "contain"-Verhalten: das Foto wird unverzerrt (eigenes
+    # Seitenverhaeltnis bleibt erhalten, kein Zuschneiden) so groß wie
+    # moeglich in die vorgesehene Fotobox eingepasst - ob Hochformat,
+    # Querformat oder ein extremes Panorama. Frueher wurde das Verhaeltnis
+    # auf 0,65-1,7 geklemmt, bevor add_picture() Breite UND Hoehe explizit
+    # gesetzt hat - das hat Fotos außerhalb dieses Bereichs gestaucht/
+    # gestreckt statt sie nur zu verkleinern.
     ratio = w_px / h_px
-    ratio = max(0.65, min(1.7, ratio))
     h_in = max_h_in
     w_in = max_h_in * ratio
     if w_in > max_w_in:
