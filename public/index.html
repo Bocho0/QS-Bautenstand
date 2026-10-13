@@ -385,7 +385,7 @@
       <label style="margin-top:14px">Vorherige Sitzung laden (fortsetzen)</label>
       <input type="file" accept=".json" id="continueImportInput" onchange="importContinueFile(event)">
 
-      <button type="button" class="btn-secondary" style="margin-top:14px" onclick="exportForWordReport()">Baustellenbesuch beenden — Fotos als .json sichern</button>
+      <button type="button" class="btn-secondary" style="margin-top:14px" onclick="exportSessionJson()">Baustellenbesuch beenden — Fotos als .json sichern</button>
       <div class="hint">Direkt hier auf der Baustelle sichern, ohne in den Bericht-Tab zu wechseln. Die genauen Feststellungstexte trägst du später am Bildschirm im Büro ein (Tab „Bericht" → „Reihenfolge &amp; Text bearbeiten").</div>
     </div>
 
@@ -500,29 +500,19 @@
       <button class="btn-primary" onclick="exportPdf()" id="genPdfBtn">PDF exportieren</button>
       <div class="hint" id="genPdfHint">Erstellt direkt eine PDF-Datei aus der aktuellen Vorschau unten — die Vorschau wird davor automatisch aktualisiert.</div>
 
-      <button class="btn-secondary" style="margin-top:10px" onclick="exportForWordReport()" id="genJsonBtn">Berichtsdaten herunterladen (.json)</button>
-      <div class="hint">Zum Fortführen dieser Baustelle beim nächsten Termin oder im nächsten Bericht wieder hochladen (Tab „Erfassen" → „Vorherige Sitzung laden") — dient außerdem als Sicherung und lässt sich alternativ im Chat mit Claude zu einem Word-Bericht verarbeiten.</div>
-
-      <details class="help" style="margin-top:14px">
-        <summary>Word-Bericht erstellen (.docx)</summary>
-        <div class="ex">Nur noch für den Fall, dass eine bearbeitbare Word-Datei gebraucht wird — für den normalen Versand reicht die PDF-Datei oben.</div>
-        <button class="btn-secondary small" style="margin-top:8px" onclick="generateWordReport()" id="genWordBtn">Word-Bericht erstellen</button>
-        <div class="hint" id="genWordHint"></div>
-      </details>
-
-      <details class="help" style="margin-top:14px">
-        <summary>Bericht in 2 Teilen erstellen (bei zu großer Datenmenge)</summary>
-        <div class="ex">Nur nötig, wenn oben beim Word-Bericht eine Meldung zu zu großer Datenmenge erscheint (z. B. bei vielen Fotos) — teilt in zwei Word-Dateien auf, ohne Fotoqualität zu verlieren.</div>
-        <button class="btn-secondary small" style="margin-top:8px" onclick="splitAndDownloadReport()" id="splitBtn">Bericht in 2 Teilen erstellen</button>
-        <button class="btn-secondary small" style="margin-top:8px;display:none" onclick="downloadTeil2()" id="splitBtn2">Teil 2 herunterladen</button>
-        <div class="hint" id="splitHint"></div>
-      </details>
+      <button class="btn-secondary" style="margin-top:10px" onclick="exportSessionJson()" id="genJsonBtn">Berichtsdaten herunterladen (.json)</button>
+      <div class="hint">Zum Fortführen dieser Baustelle beim nächsten Termin oder im nächsten Bericht wieder hochladen (Tab „Erfassen" → „Vorherige Sitzung laden") — dient außerdem als Sicherung.</div>
 
       <details class="help" style="margin-top:14px">
         <summary>Sammlung vollständig abschließen (Zwischenspeicher leeren)</summary>
-        <div class="ex">Löscht alle aktuell erfassten Feststellungen sowie die Deckblatt-/Rahmentermin-Angaben aus dem Zwischenspeicher dieses Geräts, z. B. wenn der Bericht bereits anderweitig fertiggestellt wurde. Nicht nötig nach "Word-Bericht erstellen" — das leert den Zwischenspeicher automatisch.</div>
+        <div class="ex">Löscht alle aktuell erfassten Feststellungen sowie die Deckblatt-/Rahmentermin-Angaben aus dem Zwischenspeicher dieses Geräts, z. B. wenn der Bericht bereits anderweitig fertiggestellt wurde.</div>
         <button class="btn-secondary small" style="margin-top:8px" onclick="finishCollection()">Sammlung abschließen</button>
       </details>
+    </div>
+
+    <div class="card no-print" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <button type="button" class="btn-secondary small" id="refreshPreviewBtn" onclick="refreshReportViews()">↻ Vorschau aktualisieren</button>
+      <span class="hint" style="margin:0">Übernimmt Änderungen aus Berichtskopf und Feststellungen in die Vorschau unten.</span>
     </div>
 
     <div class="report-doc" id="reportOutput"></div>
@@ -582,7 +572,7 @@ let logoDataUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEUAAABFCAMAAAA
 // ===================== LOKALE ZWISCHENSPEICHERUNG (IndexedDB) =====================
 // Sichert jede Feststellung sofort im Browser, damit sie ein Neuladen der Seite,
 // ein Schließen/Wiederöffnen des Tablets oder ein vom System beendetes Browser-Tab
-// übersteht. Die Daten bleiben erhalten, bis entweder (a) ein Word-Bericht
+// übersteht. Die Daten bleiben erhalten, bis entweder (a) ein PDF-Bericht
 // erfolgreich erstellt/heruntergeladen wurde oder (b) die Sammlung über den
 // Button "Sammlung abschließen" bewusst zurückgesetzt wird.
 const IDB_NAME = 'qsBautenstandDB';
@@ -801,7 +791,7 @@ function guessKuerzel(){
 }
 
 // Dateiname automatisch aus Datum + Berichts-Nr. + Baustellen-Kürzel
-// ableiten: JJMMTT_QS-Bericht-Nr-Kürzel, z. B. "260910_QS-Bericht-4-CHA.docx".
+// ableiten: JJMMTT_QS-Bericht-Nr-Kürzel, z. B. "260910_QS-Bericht-4-CHA".
 // Wird bei jeder Berichtserstellung frisch berechnet (nicht nur einmalig bei
 // Verlassen eines Feldes gespeichert), damit er auch dann stimmt, wenn sich
 // Datum/Projekt/Nr. zwischenzeitlich geändert haben.
@@ -812,19 +802,19 @@ function autoDateinameFromInputs(){
   if(berichtsModus === 'kurz'){
     // Kurzbericht: Berichtsnummer entfaellt, stattdessen dasselbe Datum wie
     // "Datum Bericht" oben - "JJMMTT_Kurzbericht-Baustellenbegehung-Kürzel",
-    // z. B. "260910_Kurzbericht-Baustellenbegehung-CHA.docx".
+    // z. B. "260910_Kurzbericht-Baustellenbegehung-CHA".
     const iso = parseGermanDateToISO(document.getElementById('rDatum').value);
     if(!iso) return '';
     const jj = iso.slice(2,4), mm = iso.slice(5,7), tt = iso.slice(8,10);
-    return `${jj}${mm}${tt}_Kurzbericht-Baustellenbegehung-${kuerzelClean}.docx`;
+    return `${jj}${mm}${tt}_Kurzbericht-Baustellenbegehung-${kuerzelClean}`;
   }
   const iso = parseGermanDateToISO(document.getElementById('rDatum').value);
   const nr = document.getElementById('rBerichtsNr').value.trim();
   if(!iso) return '';
   const jj = iso.slice(2,4), mm = iso.slice(5,7), tt = iso.slice(8,10);
   return nr
-    ? `${jj}${mm}${tt}_QS-Bericht-${nr}-${kuerzelClean}.docx`
-    : `${jj}${mm}${tt}_QS-Bericht-${kuerzelClean}.docx`;
+    ? `${jj}${mm}${tt}_QS-Bericht-${nr}-${kuerzelClean}`
+    : `${jj}${mm}${tt}_QS-Bericht-${kuerzelClean}`;
 }
 
 updateHeaderProj();
@@ -900,54 +890,6 @@ async function saveToGalleryBlob(blob, entry){
   setTimeout(() => URL.revokeObjectURL(url), 20000);
 }
 
-// Gemeinsame Kern-Logik zum Anfragen + Herunterladen eines Word-Berichts,
-// wiederverwendet von generateWordReport() und splitAndDownloadReport().
-// Für die Word-Erstellung auf dem Server wird nur die bereits auf die
-// Fotobox zugeschnittene, mittelgroße photoWordUrl gebraucht (höhere
-// Qualität als die winzige UI-Vorschau photoUrl, aber deutlich kleiner als
-// die volle Druckauflösung photoPrintUrl). Beide anderen Fotoversionen
-// NICHT mitschicken - das würde die ohnehin schon knapp bemessene Vercel-
-// Größengrenze unnötig sprengen. photoWordUrl wird dafür auf das vom Server
-// erwartete Feld "photoUrl" umbenannt.
-function stripPrintPhotos(entries){
-  return entries.map(e => {
-    const { photoPrintUrl, photoWordUrl, photoUrl, ...rest } = e;
-    if(photoWordUrl) rest.photoUrl = photoWordUrl;
-    else if(photoUrl) rest.photoUrl = photoUrl; // Fallback für ältere Feststellungen ohne photoWordUrl
-    return rest;
-  });
-}
-
-async function requestAndDownloadWordDoc(payload, btn, hint){
-  const payloadStr = JSON.stringify(payload);
-  const estMB = payloadStr.length / (1024 * 1024);
-  if(estMB > 4){
-    return { ok: false, tooLarge: true, estMB };
-  }
-  const res = await fetch('/api/index', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: payloadStr
-  });
-  if(!res.ok){
-    const errText = await res.text().catch(()=>'');
-    if(res.status === 413){
-      throw new Error('Die Fotos sind zusammen zu groß für die Word-Erstellung (Vercel-Grenze: 4,5 MB).');
-    }
-    throw new Error('Server antwortete mit Fehler ' + res.status + (errText ? ': ' + errText : ''));
-  }
-  const blob = await res.blob();
-  const cd = res.headers.get('Content-Disposition') || '';
-  const match = cd.match(/filename="?([^"]+)"?/);
-  const filename = match ? match[1] : 'bericht.docx';
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = filename;
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 4000);
-  return { ok: true, filename };
-}
-
 function buildBerichtskopfPayload(){
   return {
     projekt: document.getElementById('rProjekt').value,
@@ -967,159 +909,11 @@ function buildBerichtskopfPayload(){
     // Immer frisch berechnet (JJMMTT_QS-Bericht-Nr-Kürzel) statt aus einem
     // Eingabefeld gelesen - so stimmt er garantiert auch dann, wenn Datum/
     // Nr./Projekt sich seit dem letzten Mal geändert haben.
-    dateiname: autoDateinameFromInputs() || 'bericht.docx'
+    dateiname: autoDateinameFromInputs() || 'bericht'
   };
 }
 
-async function generateWordReport(){
-  if(allEntries.length === 0){ alert('Noch keine Feststellungen erfasst.'); return; }
-  const btn = document.getElementById('genWordBtn');
-  const hint = document.getElementById('genWordHint');
-  btn.disabled = true; btn.textContent = 'Erstelle Bericht …';
-
-  const payload = {
-    berichtskopf: buildBerichtskopfPayload(),
-    entries: stripPrintPhotos(allEntries),
-    verlauf: verlaufEntries,
-    startNr: getStartNr()
-  };
-
-  try{
-    const result = await requestAndDownloadWordDoc(payload, btn, hint);
-    if(result.tooLarge){
-      btn.disabled = false; btn.textContent = 'Word-Bericht erstellen';
-      alert('Die Fotomenge in diesem Bericht ist mit ca. ' + result.estMB.toFixed(1) + ' MB zu groß für die Word-Erstellung (Grenze liegt bei 4,5 MB) und würde mit einem Serverfehler abbrechen.\n\nBitte unten den Button "Bericht in 2 Teilen erstellen" nutzen — dabei bleibt die volle Fotoqualität erhalten, nur die Datenmenge pro Datei wird kleiner.');
-      return;
-    }
-    hint.textContent = 'Fertig — "' + result.filename + '" wurde heruntergeladen.';
-    // Bericht ist erfolgreich heruntergeladen: Feststellungen und Deckblatt-
-    // Angaben aus dem Zwischenspeicher leeren, damit beim nächsten Öffnen der
-    // App nicht wieder derselbe (bereits abgeschlossene) Bericht auftaucht.
-    // Der Berichts-Verlauf bleibt bewusst erhalten - der begleitet die ganze
-    // Berichtsreihe weiter.
-    await idbClearEntries();
-    await idbDeleteMetaKey('berichtskopf');
-  }catch(err){
-    console.error(err);
-    alert('Bericht konnte nicht erstellt werden: ' + (err && err.message ? err.message : err) + '\n\nAlternativ unten die Rohdaten herunterladen und im Chat bei Claude hochladen.');
-  }finally{
-    btn.disabled = false; btn.textContent = 'Word-Bericht erstellen';
-  }
-}
-
-// Bericht in zwei ungefähr gleich große Teile aufteilen (nach geschätzter
-// Datenmenge, nicht nur nach Anzahl - Fotos sind unterschiedlich groß) und
-// als zwei separate Word-Dateien herunterladen. Löst die 4,5-MB-Grenze,
-// ohne die Fotoqualität reduzieren zu müssen. Dokumentations-Feststellungen
-// werden dabei fortlaufend nummeriert (Teil 2 setzt die Nr. von Teil 1 fort).
-// Zwischenspeicher fuer Teil 2, bis der Nutzer den eigenen "Teil 2
-// herunterladen"-Button klickt (siehe Begruendung unten).
-let pendingTeil2Payload = null;
-
-async function splitAndDownloadReport(){
-  if(allEntries.length < 2){ alert('Dafür werden mindestens 2 Feststellungen benötigt.'); return; }
-  const btn = document.getElementById('splitBtn');
-  const hint = document.getElementById('splitHint');
-  const teil2Btn = document.getElementById('splitBtn2');
-
-  const sorted = allEntries.slice().sort((a,b) => (a.sortOrder||0)-(b.sortOrder||0));
-  const sizes = sorted.map(e => JSON.stringify(e).length);
-  const totalSize = sizes.reduce((a,b)=>a+b, 0);
-  let acc = 0, splitIdx = sorted.length;
-  for(let i=0;i<sorted.length;i++){
-    acc += sizes[i];
-    if(acc >= totalSize/2){ splitIdx = i+1; break; }
-  }
-  // An einer vollen 3er-Gruppe ausrichten (3 Feststellungen passen pro
-  // Seite) - so wird exakt an einer Seitengrenze geteilt statt mitten in
-  // einer Seite, die im fertigen Bericht sonst zwischen beiden Dateien
-  // auseinandergerissen würde.
-  const rounded = Math.round(splitIdx / 3) * 3;
-  if(rounded > 0 && rounded < sorted.length) splitIdx = rounded;
-  splitIdx = Math.max(1, Math.min(splitIdx, sorted.length-1));
-  const teil1 = sorted.slice(0, splitIdx);
-  const teil2 = sorted.slice(splitIdx);
-
-  if(!confirm('Bericht in 2 Dateien aufteilen?\n\nTeil 1: ' + teil1.length + ' Feststellungen\nTeil 2: ' + teil2.length + ' Feststellungen\n\nTeil 1 wird jetzt heruntergeladen. Browser blockieren mehrere automatische Downloads hintereinander - für Teil 2 erscheint danach ein eigener Button.')) return;
-
-  btn.disabled = true; btn.textContent = 'Erstelle Teil 1 …';
-  hint.textContent = '';
-  teil2Btn.style.display = 'none';
-
-  const baseBk = buildBerichtskopfPayload();
-  const baseName = baseBk.dateiname.replace(/\.docx$/i, '');
-  const startNr1 = getStartNr();
-  const dokuCount1 = teil1.filter(e => e.type === 'doku').length;
-  const startNr2 = startNr1 + dokuCount1;
-
-  // Seitenzahlen fuer einen "wie aus einem Guss" wirkenden zweiteiligen
-  // Export vorab berechnen (3 Feststellungen pro Seite, wie im Word-
-  // Dokument) - Word kann Felder wie NUMPAGES/PAGE nicht über zwei
-  // getrennte Dateien hinweg summieren/fortzählen, daher hier fest
-  // vorausberechnet und an report_core.py übergeben.
-  const teil1Pages = 2 + Math.ceil(teil1.length / 3); // Deckblatt + Rahmentermine + Dokumentation
-  const teil2Pages = Math.ceil(teil2.length / 3);
-  const combinedTotalPages = teil1Pages + teil2Pages;
-
-  try{
-    const payload1 = {
-      berichtskopf: { ...baseBk, dateiname: baseName + '_Teil-1-von-2.docx', dateinameFooter: baseName + '.docx', combinedTotalPages },
-      entries: stripPrintPhotos(teil1), verlauf: verlaufEntries, startNr: startNr1
-    };
-    const r1 = await requestAndDownloadWordDoc(payload1);
-    if(r1.tooLarge){
-      alert('Selbst die Hälfte ist mit ca. ' + r1.estMB.toFixed(1) + ' MB noch zu groß. Bitte den Bericht in mehr als 2 Teilen erstellen (Feststellungen manuell in kleineren Gruppen exportieren) oder die Rohdaten im Chat bei Claude hochladen.');
-      return;
-    }
-
-    // Teil 2 NICHT sofort automatisch herunterladen - Browser blockieren
-    // einen zweiten, unmittelbar folgenden automatischen Download ohne
-    // eigene Nutzeraktion dazwischen (Anti-Spam-Schutz). Stattdessen: Teil 2
-    // vorbereiten und einen eigenen Button zum Herunterladen anzeigen.
-    // onlyContent: Teil 2 bekommt kein eigenes Titelblatt/Rahmentermine mehr
-    // - nur die Feststellungen/Veranlassungen selbst (die stehen ja schon
-    // vollständig in Teil 1).
-    pendingTeil2Payload = {
-      berichtskopf: { ...baseBk, dateiname: baseName + '_Teil-2-von-2.docx', dateinameFooter: baseName + '.docx', combinedTotalPages, pageStart: teil1Pages + 1 },
-      entries: stripPrintPhotos(teil2), verlauf: verlaufEntries, startNr: startNr2, onlyContent: true
-    };
-    hint.textContent = 'Teil 1 ("' + r1.filename + '") heruntergeladen. Jetzt Teil 2 herunterladen:';
-    teil2Btn.style.display = 'block';
-    teil2Btn.disabled = false;
-    teil2Btn.textContent = 'Teil 2 herunterladen (' + teil2.length + ' Feststellungen)';
-  }catch(err){
-    console.error(err);
-    alert('Aufteilen fehlgeschlagen: ' + (err && err.message ? err.message : err));
-  }finally{
-    btn.disabled = false; btn.textContent = 'Bericht in 2 Teilen erstellen';
-  }
-}
-
-async function downloadTeil2(){
-  if(!pendingTeil2Payload){ alert('Bitte zuerst Teil 1 erstellen.'); return; }
-  const teil2Btn = document.getElementById('splitBtn2');
-  const hint = document.getElementById('splitHint');
-  teil2Btn.disabled = true; teil2Btn.textContent = 'Erstelle Teil 2 …';
-  try{
-    const r2 = await requestAndDownloadWordDoc(pendingTeil2Payload);
-    if(r2.tooLarge){
-      alert('Teil 2 ist mit ca. ' + r2.estMB.toFixed(1) + ' MB immer noch zu groß — bitte in mehr Teile aufteilen oder die Rohdaten im Chat bei Claude hochladen.');
-      teil2Btn.disabled = false; teil2Btn.textContent = 'Teil 2 herunterladen';
-      return;
-    }
-    hint.textContent = 'Fertig — beide Teile wurden heruntergeladen.';
-    teil2Btn.style.display = 'none';
-    pendingTeil2Payload = null;
-    await idbClearEntries();
-    await idbDeleteMetaKey('berichtskopf');
-  }catch(err){
-    console.error(err);
-    alert('Teil 2 konnte nicht erstellt werden: ' + (err && err.message ? err.message : err));
-    teil2Btn.disabled = false; teil2Btn.textContent = 'Teil 2 herunterladen';
-  }
-}
-
-function exportForWordReport(){
+function exportSessionJson(){
   const payload = {
     berichtskopf: buildBerichtskopfPayload(),
     entries: allEntries,
@@ -1130,7 +924,7 @@ function exportForWordReport(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = (autoDateinameFromInputs() || 'qs-bericht.docx').replace(/\.docx$/i, '.json');
+  a.download = (autoDateinameFromInputs() || 'qs-bericht').replace(/\.(docx|pdf)$/i, '') + '.json';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -1483,8 +1277,7 @@ function processSinglePhoto(file, sortOrder){
     const previewDataUrl = smallCanvas.toDataURL('image/jpeg', 0.65);
 
     // Pixelgenauer Zuschnitt auf das Seitenverhaeltnis der Fotobox im
-    // Bericht (84 x 63mm) - ein reiner Crop ohne Verzerrung, gemeinsame
-    // Grundlage für die Druck- und die Word-Version unten.
+    // Bericht (84 x 63mm) - ein reiner Crop ohne Verzerrung, 
     const boxRatio = 317.5 / 238.1; // entspricht der CSS-Fotobox im Bericht
     const srcRatio = fullW / fullH;
     let cropX = 0, cropY = 0, cropW = fullW, cropH = fullH;
@@ -1496,37 +1289,23 @@ function processSinglePhoto(file, sortOrder){
       cropY = Math.round((fullH - cropH) / 2);
     }
 
-    // Version in voller Original-Auflösung NUR für den PDF-Export und die
-    // Berichtsvorschau (kein Vercel-Größenlimit dort, da das PDF vollständig
-    // im Browser erzeugt wird) - höchstmögliche Bildqualität, keine
-    // Verkleinerung. So muss beim Rendern (auch im PDF-Export via
-    // html2canvas) nicht mehr per CSS zugeschnitten oder skaliert werden,
-    // was dort sichtbar unscharfe/niedrig aufgelöste Fotos verursacht hatte.
+    // Druckversion für Berichtsvorschau und PDF-Export: auf die Fotobox
+    // zugeschnitten und auf max. 2400 px Breite (~725 dpi in der 84-mm-Box)
+    // bei JPEG-Qualität 92 % begrenzt - optisch kein Unterschied zum Original,
+    // aber nur ~0,5 MB statt 3-4 MB pro Foto. Beim PDF-Export wird bei vielen
+    // Fotos automatisch noch stufenweise weiter angepasst (siehe exportPdf),
+    // damit die Datei unter 20 MB (Mail-Limit) bleibt. Das Original liegt
+    // unverändert in der Fotogalerie.
+    const printMaxW = 2400;
+    const pw = Math.min(cropW, printMaxW);
+    const ph = Math.round(cropH * pw / cropW);
     const printCanvas = document.createElement('canvas');
-    printCanvas.width = cropW; printCanvas.height = cropH;
+    printCanvas.width = pw; printCanvas.height = ph;
     const printCtx = printCanvas.getContext('2d');
-    printCtx.drawImage(oriented, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
-    drawTimestamp(printCtx, cropW, cropH);
-    const printDataUrl = printCanvas.toDataURL('image/jpeg', 0.97);
-
-    // Eigene, bereits zugeschnittene Version für die Word-Erstellung auf dem
-    // Server (muss unter der Vercel-Größengrenze bleiben, siehe
-    // requestAndDownloadWordDoc) - vorher wurde dafür versehentlich die
-    // winzige UI-Vorschau (previewDataUrl, nur 65% JPEG-Qualität) verwendet,
-    // die dann serverseitig nochmal zugeschnitten und neu komprimiert wurde
-    // ("Qualität komplett verloren"). Da hier bereits auf die Fotobox
-    // zugeschnitten wird, fallen keine Pixel an, die ohnehin weggeschnitten
-    // würden - dadurch ist trotz höherer Qualität (85% statt 65%) die
-    // Dateigröße ähnlich oder kleiner als vorher.
-    const wordMaxDim = 1200;
-    let ww = cropW, wh = cropH;
-    if (ww > wh && ww > wordMaxDim){ wh = Math.round(wh * wordMaxDim / ww); ww = wordMaxDim; }
-    else if (wh >= ww && wh > wordMaxDim){ ww = Math.round(ww * wordMaxDim / wh); wh = wordMaxDim; }
-    const wordCanvas = document.createElement('canvas');
-    wordCanvas.width = ww; wordCanvas.height = wh;
-    const wordCtx = wordCanvas.getContext('2d');
-    wordCtx.drawImage(printCanvas, 0, 0, cropW, cropH, 0, 0, ww, wh);
-    const photoWordUrl = wordCanvas.toDataURL('image/jpeg', 0.85);
+    printCtx.imageSmoothingQuality = 'high';
+    printCtx.drawImage(oriented, cropX, cropY, cropW, cropH, 0, 0, pw, ph);
+    drawTimestamp(printCtx, pw, ph);
+    const printDataUrl = printCanvas.toDataURL('image/jpeg', 0.92);
 
     // Vollformat-Version in Original-Auflösung für die Fotogalerie (nicht
     // Teil des Berichts/JSON - nur fürs eigene Archiv auf dem Gerät).
@@ -1547,7 +1326,7 @@ function processSinglePhoto(file, sortOrder){
             id: entryId, type: currentType, gewerk: '', ort: '', arbeiten: '',
             bauteil: '', material: '', verantwortlich: '',
             datum: entryDatum, datumISO: entryDatumISO, bearbeitet: false,
-            sortOrder, photoUrl: previewDataUrl, photoPrintUrl: printDataUrl, photoWordUrl, createdAt: Date.now()
+            sortOrder, photoUrl: previewDataUrl, photoPrintUrl: printDataUrl, createdAt: Date.now()
           };
           allEntries.push(entry);
           renderRecent();
@@ -2129,7 +1908,7 @@ function entryRow(nrLabel, e, showVerantwortlich){
   </tr>`;
 }
 
-// In Gruppen zu je 3 aufteilen - genau wie im Word-Dokument passen
+// In Gruppen zu je 3 aufteilen - genau wie im PDF passen
 // zuverlässig 3 Feststellungen mit Foto auf eine Seite.
 function chunk3(arr){
   const out = [];
@@ -2164,8 +1943,8 @@ function renderReport(){
   const kurzDateJJMMTT = berichtDatumIso ? berichtDatumIso.slice(2,4) + berichtDatumIso.slice(5,7) + berichtDatumIso.slice(8,10) : isoToday;
   const kuerzelClean = (guessKuerzel() || escapeHtml(verfasser)).replace(/[^A-Za-z0-9äöüÄÖÜß-]+/g,'');
   const autoDateiname = kurz
-    ? `${kurzDateJJMMTT}_Kurzbericht-Baustellenbegehung-${kuerzelClean}.docx`
-    : isoToday + '_' + escapeHtml(verfasser) + '-QS-Bautenstand_' + berichtsNrPadded + '.docx';
+    ? `${kurzDateJJMMTT}_Kurzbericht-Baustellenbegehung-${kuerzelClean}`
+    : isoToday + '_' + escapeHtml(verfasser) + '-QS-Bautenstand_' + berichtsNrPadded;
   const dateiname = (document.getElementById('rDateiname').value.trim() || autoDateiname).replace(/\.docx$/i, '');
 
   const verteilerRows = parseSemicolonRows(document.getElementById('rVerteiler').value);
@@ -2209,7 +1988,7 @@ function renderReport(){
         <span><i style="background:#D9463B"></i>Termin überschritten</span>
       </div>`;
 
-    // Verlauf vorheriger Berichte gehört (wie im Word-Dokument) auf die
+    // Verlauf vorheriger Berichte gehört (wie im PDF) auf die
     // Rahmentermine-Seite, nicht auf die Dokumentationsseite.
     if(verlaufEntries.length){
       rahmenBody += `<h3 class="section">Verlauf vorheriger Berichte</h3>
@@ -2332,6 +2111,47 @@ function renderReport(){
   document.getElementById('reportOutput').innerHTML = html;
 }
 
+// ---- PDF-Größensteuerung (Ziel: Mail-Limit 20 MB) -------------------------
+// Die Fotobox im Bericht ist nur 84 x 63 mm groß: 1600 px Breite entsprechen
+// dort bereits ~480 dpi (Druck braucht ~300). Beim Export wird deshalb die
+// höchste Stufe gewählt, mit der die Gesamtdatei unter dem Ziel bleibt.
+const PDF_TARGET_BYTES = 17.5 * 1024 * 1024; // Puffer unter 20 MB (Mail-Overhead/Base64)
+const PHOTO_LEVELS = [
+  { w: 2400, q: 0.92 },
+  { w: 2000, q: 0.90 },
+  { w: 1800, q: 0.88 },
+  { w: 1600, q: 0.85 },
+  { w: 1400, q: 0.82 },
+  { w: 1200, q: 0.80 }
+];
+function dataUrlBytes(u){
+  const i = u.indexOf(',');
+  return Math.round((u.length - i - 1) * 0.75);
+}
+const _photoImgCache = new Map();
+function loadImgCached(src){
+  if(_photoImgCache.has(src)) return _photoImgCache.get(src);
+  const p = new Promise((resolve, reject) => {
+    const im = new Image();
+    im.onload = () => resolve(im);
+    im.onerror = () => reject(new Error('Foto konnte nicht gelesen werden'));
+    im.src = src;
+  });
+  _photoImgCache.set(src, p);
+  return p;
+}
+async function reencodePhoto(src, maxW, q){
+  const im = await loadImgCached(src);
+  const w = Math.min(im.naturalWidth, maxW);
+  const h = Math.round(im.naturalHeight * w / im.naturalWidth);
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(im, 0, 0, w, h);
+  return c.toDataURL('image/jpeg', q);
+}
+
 // Erstellt eine echte PDF-Datei direkt im Browser (kein window.print()) -
 // dadurch tauchen die Browser-eigenen Druck-Kopf-/Fußzeilen (Datum, Titel,
 // URL, Seite x/y) gar nicht erst auf, da der Browser-Druckdialog dabei
@@ -2364,21 +2184,22 @@ async function exportPdf(){
     if(document.fonts && document.fonts.ready) await document.fonts.ready;
     const pageNodes = clone.querySelectorAll('.report-page');
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
+
+    // Phase 1: alle Seiten ohne Fotos rastern (Fotos werden NICHT von
+    // html2canvas mitgerastert, sondern danach direkt per jsPDF eingefügt -
+    // html2canvas rastert eingebettete Fotos je nach Browser/Gerät sichtbar
+    // niedriger aufgelöst). Die Fotobox bleibt als Platzhalter sichtbar,
+    // damit das Seitenlayout unverändert bleibt.
+    // scale:3.13 entspricht bei 794px Seitenbreite (=210mm bei 96dpi) ~300dpi.
+    const pages = [];
+    let pageBytes = 0;
     for(let i=0; i<pageNodes.length; i++){
       const pageNode = pageNodes[i];
+      hint.textContent = 'Seite ' + (i+1) + ' von ' + pageNodes.length + ' …';
       const pageRect = pageNode.getBoundingClientRect();
       const PX_TO_MM = 210 / pageRect.width;
-
-      // Fotos werden NICHT von html2canvas mitgerastert, sondern direkt im
-      // Anschluss in voller Auflösung per jsPDF eingefügt (siehe unten) -
-      // html2canvas rastert eingebettete Fotos je nach Browser/Gerät
-      // sichtbar niedriger aufgelöst (unabhängig vom scale-Wert), was auf
-      // manchen Geräten/Domains zu spürbarem Qualitätsverlust führte. Die
-      // Fotobox bleibt als Platzhalter (Hintergrundfarbe/Rahmen) sichtbar,
-      // damit das Seitenlayout beim Rastern unverändert bleibt.
       const photoImgs = Array.from(pageNode.querySelectorAll('.entry-photo-box img'));
-      const photoPlacements = photoImgs.map(img => {
+      const placements = photoImgs.map(img => {
         const r = img.getBoundingClientRect();
         return {
           src: img.src,
@@ -2389,28 +2210,50 @@ async function exportPdf(){
         };
       });
       photoImgs.forEach(img => { img.style.visibility = 'hidden'; });
-
-      // scale:3.13 entspricht bei 794px Seitenbreite (=210mm bei 96dpi)
-      // einer Rasterauflösung von ~300dpi - Standard-Druckqualität für Text
-      // und Linien. Höhere Werte bringen kaum sichtbaren Gewinn, erhöhen
-      // aber Dateigröße und Rechenzeit überproportional.
       const canvas = await html2canvas(pageNode, { scale: 3.13, useCORS: true, backgroundColor: '#ffffff' });
-      const imgData = canvas.toDataURL('image/jpeg', 0.98);
-      if(i > 0) pdf.addPage();
-      pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
-
-      // Fotos jetzt direkt (ungerastert, volle Quellauflösung) an exakt
-      // derselben Position/Größe einfügen, an der die html2canvas-Seite sie
-      // als Platzhalter freigelassen hat.
-      photoPlacements.forEach(p => {
-        if(!p.src) return;
-        pdf.addImage(p.src, 'JPEG', p.x, p.y, p.w, p.h);
-      });
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
       photoImgs.forEach(img => { img.style.visibility = ''; });
+      pageBytes += dataUrlBytes(imgData);
+      pages.push({ imgData, placements });
     }
-    const filename = (document.getElementById('rDateiname').value.trim() || autoDateinameFromInputs() || (berichtsModus === 'kurz' ? 'kurzbericht.docx' : 'qs-bericht.docx')).replace(/\.docx$/i, '.pdf');
-    pdf.save(filename);
-    hint.textContent = 'Fertig — "' + filename + '" wurde heruntergeladen.';
+
+    // Phase 2: Fotoqualität automatisch so wählen, dass die fertige Datei
+    // unter dem Mail-Limit bleibt (höchste Stufe, die noch passt).
+    hint.textContent = 'Optimiere Fotos für Dateigröße …';
+    const uniqueSrcs = Array.from(new Set(pages.flatMap(p => p.placements.map(pl => pl.src).filter(Boolean))));
+    const photoBudget = PDF_TARGET_BYTES - pageBytes;
+    let chosen = null, chosenMap = null;
+    for(const lvl of PHOTO_LEVELS){
+      const map = new Map();
+      let total = 0;
+      for(const src of uniqueSrcs){
+        const out = await reencodePhoto(src, lvl.w, lvl.q);
+        map.set(src, out);
+        total += dataUrlBytes(out);
+      }
+      chosen = lvl; chosenMap = map;
+      if(total <= photoBudget) break;
+    }
+
+    // Phase 3: PDF zusammensetzen
+    const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
+    pages.forEach((pg, i) => {
+      if(i > 0) pdf.addPage();
+      pdf.addImage(pg.imgData, 'JPEG', 0, 0, 210, 297);
+      pg.placements.forEach(p => {
+        if(!p.src) return;
+        pdf.addImage(chosenMap.get(p.src) || p.src, 'JPEG', p.x, p.y, p.w, p.h);
+      });
+    });
+    const filename = (document.getElementById('rDateiname').value.trim() || autoDateinameFromInputs() || (berichtsModus === 'kurz' ? 'kurzbericht' : 'qs-bericht')).replace(/\.(docx|pdf)$/i, '') + '.pdf';
+    const blob = pdf.output('blob');
+    const sizeMB = blob.size / (1024*1024);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    hint.textContent = 'Fertig — "' + filename + '" wurde heruntergeladen (' + sizeMB.toFixed(1).replace('.', ',') + ' MB, Fotos mit ' + chosen.w + ' px Breite' + (sizeMB > 20 ? ' — Achtung: über 20 MB, bitte Einträge auf zwei Berichte verteilen' : '') + ').';
   }catch(err){
     console.error(err);
     alert('PDF konnte nicht erstellt werden: ' + (err && err.message ? err.message : err));
